@@ -38,9 +38,9 @@ function Activity() {
                   </>
                 ) : (
                   <>
-                    <span className={`chip ${a.state === "approved" ? "text-ok" : "text-destructive"}`}>{a.state}</span>
+                    <span className={`chip ${a.state === "approved" ? "text-ok" : a.state === "invalidated" ? "text-warn" : "text-destructive"}`}>{a.state}</span>
                     {a.state === "approved" && a.ref && (
-                      <button className="btn btn-ghost text-xs" onClick={() => { actions.setContent(a.ref!, { stage: "published" }); }}>
+                      <button className="btn btn-ghost text-xs" onClick={() => { if (confirm("Mark as published? Only do this if you posted it yourself.")) actions.setContent(a.ref!, { stage: "published" }); }}>
                         Mark published manually
                       </button>
                     )}

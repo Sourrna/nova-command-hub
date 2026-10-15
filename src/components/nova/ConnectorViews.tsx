@@ -68,7 +68,7 @@ export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.Re
           {c.capabilities.map((cap) => (
             <li key={cap.label} className="flex items-center justify-between rounded-md border p-3 text-sm">
               <span>{cap.label}</span>
-              <span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span>
+              <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><button className="btn !py-0.5 text-xs" disabled title={h.status === "needs_setup" || h.status === "disconnected" ? "Unavailable until configured" : "Adapter not implemented yet"}>{h.status === "needs_setup" || h.status === "disconnected" ? "Unavailable" : "Not wired"}</button></span>
             </li>
           ))}
         </ul>

@@ -42,7 +42,7 @@ function Studio() {
           <input className="field w-44" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search content" />
           <select className="field w-32" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter channel"><option value="all">All channels</option><option>LinkedIn</option><option>Notion</option><option>GitHub</option></select>
         </form>
-        <p className="mt-2 text-xs text-muted-foreground">Moving an item from Approved to Published creates an approval request. No post is sent until a real adapter is connected.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Moving an item from Approved to Published creates an approval request. Editing an approved item invalidates its approval and returns it to Review. No post is sent until a real adapter is connected.</p>
       </Panel>
       <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
         {STAGES.map((st) => {
@@ -56,7 +56,7 @@ function Studio() {
                     return (
                       <li key={c.id} className="rounded-md border bg-background/40 p-3">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm">{c.title}</p>
+                          <input className="field !border-transparent !bg-transparent !p-0 text-sm" value={c.title} aria-label="Title" onChange={(e) => actions.setContent(c.id, { title: e.target.value })} />
                           <button className="text-muted-foreground hover:text-destructive" onClick={() => actions.delContent(c.id)} aria-label="Delete"><Trash2 size={13} /></button>
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1"><span className="label-hud">{c.channel}</span>{c.demo && <DemoTag />}{waiting && <span className="chip text-warn">awaiting approval</span>}</div>
