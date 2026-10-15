@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { group: "Operations", items: [
-    { to: "/", label: "Command Center", icon: Gauge },
+    { to: "/", label: "Overview", icon: Gauge },
     { to: "/core", label: "Nova Core", icon: Cpu },
     { to: "/content", label: "Content Studio", icon: FileText },
     { to: "/projects", label: "Projects", icon: FolderKanban },
@@ -24,7 +24,7 @@ const NAV = [
     { to: "/linkedin", label: "LinkedIn", icon: Linkedin },
   ]},
   { group: "Workspace", items: [
-    { to: "/activity", label: "Activity Log", icon: Activity },
+    { to: "/activity", label: "Activity", icon: Activity },
     { to: "/settings", label: "Settings", icon: Settings },
   ]},
 ] as const;

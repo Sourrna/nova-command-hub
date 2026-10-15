@@ -8,7 +8,7 @@ export interface ContentItem { id: string; title: string; channel: string; stage
 export interface Project { id: string; name: string; status: "active" | "paused" | "done"; progress: number; demo?: boolean }
 export interface Memory { id: string; text: string; tag: string; created: number }
 export interface LogEntry { id: string; at: number; kind: "info" | "approval" | "blocked" | "local"; message: string }
-export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected"; ref?: string | undefined }
+export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected" | "invalidated"; ref?: string | undefined }
 
 export interface NovaState {
   lang: "en" | "fa";
@@ -75,17 +75,24 @@ export const actions = {
     update((s) => ({ tasks: [{ id: uid(), title, status: "todo", priority, created: now() }, ...s.tasks] }), `Task created: ${title}`),
   setTask: (id: string, p: Partial<Task>) => update((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...p } : t)) }),
     p.status ? `Task moved to ${p.status}` : undefined),
-  delTask: (id: string) => update((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }), "Task deleted"),
+  delTask: (id: string) => confirm('Delete this task? This cannot be undone.') && update((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }), "Task deleted"),
   addContent: (title: string, channel: string) =>
     update((s) => ({ content: [{ id: uid(), title, channel, stage: "idea", notes: "", updated: now() }, ...s.content] }), `Content idea added: ${title}`),
-  setContent: (id: string, p: Partial<ContentItem>) =>
-    update((s) => ({ content: s.content.map((c) => (c.id === id ? { ...c, ...p, updated: now() } : c)) }), p.stage ? `Content moved to ${p.stage}` : undefined),
-  delContent: (id: string) => update((s) => ({ content: s.content.filter((c) => c.id !== id) }), "Content deleted"),
+  setContent: (id: string, p: Partial<ContentItem>) => {
+    const cur = load().content.find((c) => c.id === id);
+    const edited = cur && (("title" in p && p.title !== cur.title) || ("notes" in p && p.notes !== cur.notes));
+    const invalidate = !!edited && !!cur && (cur.stage === "approved" || load().approvals.some((a) => a.ref === id && (a.state === "pending" || a.state === "approved")));
+    update((s) => ({
+      content: s.content.map((c) => (c.id === id ? { ...c, ...p, ...(invalidate && c.stage === "approved" ? { stage: "review" as Stage } : {}), updated: now() } : c)),
+      approvals: invalidate ? s.approvals.map((a) => (a.ref === id && (a.state === "pending" || a.state === "approved") ? { ...a, state: "invalidated" as const } : a)) : s.approvals,
+    }), invalidate ? `Edit invalidated approval for "${cur!.title}" — returned to review` : p.stage ? `Content moved to ${p.stage}` : undefined, invalidate ? "approval" : "local");
+  },
+  delContent: (id: string) => confirm('Delete this content item? This cannot be undone.') && update((s) => ({ content: s.content.filter((c) => c.id !== id) }), "Content deleted"),
   addProject: (name: string) => update((s) => ({ projects: [{ id: uid(), name, status: "active", progress: 0 }, ...s.projects] }), `Project created: ${name}`),
   setProject: (id: string, p: Partial<Project>) => update((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
-  delProject: (id: string) => update((s) => ({ projects: s.projects.filter((x) => x.id !== id) }), "Project deleted"),
+  delProject: (id: string) => confirm('Delete this project? This cannot be undone.') && update((s) => ({ projects: s.projects.filter((x) => x.id !== id) }), "Project deleted"),
   addMemory: (text: string, tag: string) => update((s) => ({ memory: [{ id: uid(), text, tag, created: now() }, ...s.memory] }), "Memory saved"),
-  delMemory: (id: string) => update((s) => ({ memory: s.memory.filter((m) => m.id !== id) }), "Memory removed"),
+  delMemory: (id: string) => confirm('Delete this memory? This cannot be undone.') && update((s) => ({ memory: s.memory.filter((m) => m.id !== id) }), "Memory removed"),
   requestApproval: (action: string, target: string, connector: string, ref?: string) =>
     update((s) => ({ approvals: [{ id: uid(), at: now(), action, target, connector, state: "pending", ref }, ...s.approvals] }),
       `Approval requested: ${action} → ${target}`, "approval"),
