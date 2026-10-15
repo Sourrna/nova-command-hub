@@ -59,4 +59,4 @@ export function Stat({ label, value, sub }: { label: string; value: ReactNode; s
   );
 }
 
-export const fmtTime = (t: number) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+export const fmtTime = (t: number) => new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";

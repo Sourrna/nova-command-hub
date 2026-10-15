@@ -20,24 +20,25 @@ export interface NovaState {
 const KEY = "nova-brand-os-v1";
 const uid = () => Math.random().toString(36).slice(2, 10);
 const now = () => Date.now();
+const SEED_AT = Date.UTC(2026, 9, 1, 9, 0);
 
 const seed = (): NovaState => ({
   lang: "en", disabled: [],
   tasks: [
-    { id: uid(), title: "Define Q4 positioning statement", status: "doing", priority: "high", created: now() },
-    { id: uid(), title: "Collect 5 case-study wins", status: "todo", priority: "med", created: now() },
+    { id: uid(), title: "Define Q4 positioning statement", status: "doing", priority: "high", created: SEED_AT },
+    { id: uid(), title: "Collect 5 case-study wins", status: "todo", priority: "med", created: SEED_AT },
   ],
   content: [
-    { id: uid(), title: "Why operators beat strategists", channel: "LinkedIn", stage: "draft", notes: "", demo: true, updated: now() },
-    { id: uid(), title: "Behind the build: Nova OS", channel: "LinkedIn", stage: "idea", notes: "", demo: true, updated: now() },
-    { id: uid(), title: "Weekly newsletter #12", channel: "Notion", stage: "review", notes: "", demo: true, updated: now() },
+    { id: uid(), title: "Why operators beat strategists", channel: "LinkedIn", stage: "draft", notes: "", demo: true, updated: SEED_AT },
+    { id: uid(), title: "Behind the build: Nova OS", channel: "LinkedIn", stage: "idea", notes: "", demo: true, updated: SEED_AT },
+    { id: uid(), title: "Weekly newsletter #12", channel: "Notion", stage: "review", notes: "", demo: true, updated: SEED_AT },
   ],
   projects: [
     { id: uid(), name: "Personal site refresh", status: "active", progress: 40, demo: true },
     { id: uid(), name: "Speaking kit", status: "paused", progress: 15, demo: true },
   ],
-  memory: [{ id: uid(), text: "Tone: confident, concise, no hype words.", tag: "voice", created: now() }],
-  log: [{ id: uid(), at: now(), kind: "info", message: "Workspace initialised with demo data." }],
+  memory: [{ id: uid(), text: "Tone: confident, concise, no hype words.", tag: "voice", created: SEED_AT }],
+  log: [{ id: uid(), at: SEED_AT, kind: "info", message: "Workspace initialised with demo data." }],
   approvals: [],
 });
 
