@@ -40,7 +40,7 @@ function Activity() {
                   <>
                     <span className={`chip ${a.state === "approved" ? "text-ok" : "text-destructive"}`}>{a.state}</span>
                     {a.state === "approved" && a.ref && (
-                      <button className="btn btn-ghost text-xs" onClick={() => { actions.setContent(a.ref!, { stage: "published" }); actions.requestApproval; }}>
+                      <button className="btn btn-ghost text-xs" onClick={() => { actions.setContent(a.ref!, { stage: "published" }); }}>
                         Mark published manually
                       </button>
                     )}

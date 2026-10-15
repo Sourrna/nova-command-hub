@@ -8,3 +8,8 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Architecture
+- Connectors are declared in `src/lib/nova/connectors.ts` (typed registry); pages reuse `ConnectorViews` — keeps cards/details consistent.
+- Connector health comes only from `status.functions.ts` (server env presence check); never report "connected" without a verified live call.
+- App state lives in `src/lib/nova/store.ts` (localStorage, MVP); all publish/write actions go through the approval gate and are logged.
