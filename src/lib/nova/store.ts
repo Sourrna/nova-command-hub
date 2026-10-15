@@ -8,7 +8,7 @@ export interface ContentItem { id: string; title: string; channel: string; stage
 export interface Project { id: string; name: string; status: "active" | "paused" | "done"; progress: number; demo?: boolean }
 export interface Memory { id: string; text: string; tag: string; created: number }
 export interface LogEntry { id: string; at: number; kind: "info" | "approval" | "blocked" | "local"; message: string }
-export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected"; ref?: string }
+export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected"; ref?: string | undefined }
 
 export interface NovaState {
   lang: "en" | "fa";

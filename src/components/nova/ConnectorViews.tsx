@@ -36,7 +36,7 @@ export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.Re
   const h = health.get(id);
   const qc = useQueryClient();
   const disabled = useNova((s) => s.disabled.includes(id));
-  const log = useNova((s) => s.log.filter((l) => l.message.toLowerCase().includes(c.name.split(" ")[0].toLowerCase())).slice(0, 6));
+  const log = useNova((s) => s.log.filter((l) => l.message.toLowerCase().includes((c.name.split(" ")[0] ?? c.name).toLowerCase())).slice(0, 6));
 
   return (
     <div className="space-y-4">
