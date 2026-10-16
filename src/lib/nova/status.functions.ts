@@ -15,6 +15,13 @@ export const getConnectorHealth = createServerFn({ method: "GET" }).handler(asyn
   return Promise.all(CONNECTORS.map<Promise<ConnectorHealth>>(async (c) => {
     if (c.id === "lovable")
       return { id: c.id, status: "limited", reason: "Hosting only; no programmatic API.", missing: [] };
+    if (c.id === "github") {
+      const { ghGet, GH_REPO } = await import("./github.server");
+      const r = await ghGet(`repos/${GH_REPO}`);
+      if (r.ok) return { id: c.id, status: "connected", reason: `Read access to ${GH_REPO} verified live.`, missing: [] };
+      if (r.code === "missing") return { id: c.id, status: "needs_setup", reason: r.error, missing: ["GITHUB_API_KEY"] };
+      return { id: c.id, status: r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: [] };
+    }
     const missing = c.secrets.filter((s) => !process.env[s]);
     if (missing.length)
       return { id: c.id, status: "needs_setup", reason: `Missing ${missing.join(", ")}`, missing };
