@@ -13,3 +13,4 @@
 - Connectors are declared in `src/lib/nova/connectors.ts` (typed registry); pages reuse `ConnectorViews` — keeps cards/details consistent.
 - Connector health comes only from `status.functions.ts` (server env presence check); never report "connected" without a verified live call.
 - App state lives in `src/lib/nova/store.ts` (localStorage, MVP); all publish/write actions go through the approval gate and are logged.
+- AI provider calls live in `src/lib/nova/ai.server.ts` (injectable fetch, sanitized error codes) and are exposed via `ai.functions.ts`; health marks AI connectors connected only after a live `/models` call — keeps keys server-side and statuses truthful.
