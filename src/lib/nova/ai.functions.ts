@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { generateInput, generateText, PROVIDERS } from "./ai.server";
 
-export const AI_MODELS = { openai: PROVIDERS.openai.models, xai: PROVIDERS.xai.models };
+
 
 export const generateAi = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => {

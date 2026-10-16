@@ -1,12 +1,13 @@
 // Server-only OpenAI / xAI adapters. Keys are read from process.env by callers and
 // never returned, logged, or echoed in errors.
 import { z } from "zod";
+import { AI_MODELS } from "./ai-models";
 
 export type AiProvider = "openai" | "xai";
 
 export const PROVIDERS: Record<AiProvider, { base: string; env: string; models: string[] }> = {
-  openai: { base: "https://api.openai.com/v1", env: "OPENAI_API_KEY", models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini"] },
-  xai: { base: "https://api.x.ai/v1", env: "XAI_API_KEY", models: ["grok-3-mini", "grok-3", "grok-4"] },
+  openai: { base: "https://api.openai.com/v1", env: "OPENAI_API_KEY", models: [...AI_MODELS.openai] },
+  xai: { base: "https://api.x.ai/v1", env: "XAI_API_KEY", models: [...AI_MODELS.xai] },
 };
 
 export const generateInput = z.object({

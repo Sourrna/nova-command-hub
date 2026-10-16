@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, Loader2 } from "lucide-react";
-import { AI_MODELS, generateAi } from "@/lib/nova/ai.functions";
+import { generateAi } from "@/lib/nova/ai.functions";
+import { AI_MODELS } from "@/lib/nova/ai-models";
 import { useHealth } from "@/lib/nova/health";
 import { update } from "@/lib/nova/store";
 import { Panel } from "./ui";
