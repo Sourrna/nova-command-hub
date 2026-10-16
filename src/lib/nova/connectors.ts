@@ -58,8 +58,8 @@ export const CONNECTORS: ConnectorDef[] = [
       { kind: "read", label: "Read repos & issues", gated: false },
       { kind: "write", label: "Open issues / PRs", gated: true },
     ],
-    secrets: ["GITHUB_TOKEN"],
-    setup: ["Create a fine-grained token (repo read, issues write)", "Add secret GITHUB_TOKEN"],
+    secrets: [],
+    setup: ["Linked via the Lovable GitHub connector (server-side only)", "Reads Sourrna/nova-brand-ai; writes not implemented"],
     docs: "https://docs.github.com/rest",
   },
   {
