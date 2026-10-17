@@ -34,13 +34,13 @@ export const CONNECTORS: ConnectorDef[] = [
   },
   {
     id: "notion", name: "Notion", category: "workspace",
-    description: "Sync content calendar and notes databases.",
+    description: "Search shared Notion pages and data sources with live read access.",
     capabilities: [
-      { kind: "read", label: "Read databases", gated: false },
+      { kind: "read", label: "Search pages / data sources", gated: false },
       { kind: "write", label: "Create / update pages", gated: true },
     ],
     secrets: ["NOTION_API_KEY"],
-    setup: ["Create an internal integration at notion.so/my-integrations", "Share target databases with it", "Add secret NOTION_API_KEY"],
+    setup: ["Use the linked Notion connection, or a Notion-issued integration token with NOTION_API_MODE=direct", "Share target pages and databases with the integration", "Credentials must be available as server request bindings; writes are not implemented"],
     docs: "https://developers.notion.com",
   },
   {
@@ -83,5 +83,7 @@ export const STATUS_META: Record<ConnectorStatus, { label: string; tone: string 
 };
 
 export function getConnector(id: ConnectorId) {
-  return CONNECTORS.find((c) => c.id === id)!;
+  const connector = CONNECTORS.find((c) => c.id === id);
+  if (!connector) throw new Error("Unknown connector");
+  return connector;
 }
