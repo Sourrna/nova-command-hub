@@ -22,11 +22,18 @@ export const getConnectorHealth = createServerFn({ method: "GET" }).handler(asyn
       if (r.code === "missing") return { id: c.id, status: "needs_setup", reason: r.error, missing: ["GITHUB_API_KEY"] };
       return { id: c.id, status: r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: [] };
     }
+    if (c.id === "notion") {
+      const [{ searchNotion }, { getNotionCredentials }] = await Promise.all([import("./notion.server"), import("./notion-runtime.server")]);
+      const r = await searchNotion(getNotionCredentials());
+      if (r.ok) return { id: c.id, status: "connected", reason: "Read access verified by a live Notion search.", missing: [] };
+      return { id: c.id, status: r.code === "missing" ? "needs_setup" : r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: r.code === "missing" ? ["NOTION_API_KEY"] : [] };
+    }
     const missing = c.secrets.filter((s) => !process.env[s]);
     if (missing.length)
       return { id: c.id, status: "needs_setup", reason: `Missing ${missing.join(", ")}`, missing };
     if (c.id === "openai" || c.id === "xai") {
-      const r = await testProvider(c.id, process.env[c.secrets[0]!]);
+      const secretName = c.secrets[0];
+      const r = await testProvider(c.id, secretName ? process.env[secretName] : undefined);
       if (r.ok) return { id: c.id, status: "connected", reason: "Verified by a live API call.", missing: [] };
       return { id: c.id, status: r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: [] };
     }

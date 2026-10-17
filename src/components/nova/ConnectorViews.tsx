@@ -68,11 +68,11 @@ export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.Re
           {c.capabilities.map((cap) => (
             <li key={cap.label} className="flex items-center justify-between rounded-md border p-3 text-sm">
               <span>{cap.label}</span>
-              <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><span className="chip text-idle text-xs">{c.category === "ai" ? (h.status === "connected" ? "Live — use Generate" : "Unavailable until verified") : c.id === "github" && cap.kind === "read" ? (h.status === "connected" ? "Live" : "Unavailable until verified") : "Adapter not implemented"}</span></span>
+               <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><span className="chip text-idle text-xs">{c.category === "ai" ? (h.status === "connected" ? "Live — use Generate" : "Unavailable until verified") : (c.id === "github" || c.id === "notion") && cap.kind === "read" ? (h.status === "connected" ? "Live" : "Unavailable until verified") : "Adapter not implemented"}</span></span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-muted-foreground">{c.category === "ai" ? "Status is verified with a live authenticated API call." : "Live adapter not implemented in this MVP; gated actions are logged and blocked rather than simulated."}</p>
+         <p className="mt-3 text-xs text-muted-foreground">{c.category === "ai" || c.id === "notion" || c.id === "github" ? "Read access is verified with a live authenticated API call. External writes are not implemented." : "Live adapter not implemented in this MVP; gated actions are logged and blocked rather than simulated."}</p>
       </Panel>
       {demo && <Panel title="Preview" action={<DemoTag />}>{demo}</Panel>}
       <Panel title="Recent operations">
