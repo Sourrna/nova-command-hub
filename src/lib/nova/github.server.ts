@@ -5,7 +5,7 @@ export const GH_REPO = "Sourrna/nova-brand-ai";
 export type GhResult<T> = { ok: true; data: T } | { ok: false; code: "missing" | "auth" | "rate" | "error"; error: string };
 
 export async function ghGet<T>(path: string, f: typeof fetch = fetch): Promise<GhResult<T>> {
-  const lk = process.env.LOVABLE_API_KEY, gk = process.env.GITHUB_API_KEY;
+  const lk = process.env["LOVABLE_API_KEY"], gk = process.env["GITHUB_API_KEY"];
   if (!lk || !gk) return { ok: false, code: "missing", error: "GitHub connection not linked." };
   try {
     const r = await f(`${GATEWAY}/${path}`, {
