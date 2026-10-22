@@ -89,5 +89,7 @@ export const STATUS_META: Record<ConnectorStatus, { label: string; tone: string 
 };
 
 export function getConnector(id: ConnectorId) {
-  return CONNECTORS.find((c) => c.id === id)!;
+  const connector = CONNECTORS.find((c) => c.id === id);
+  if (!connector) throw new Error("Unknown connector");
+  return connector;
 }
