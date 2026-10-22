@@ -141,7 +141,9 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
   },
 };
 
-const repoId = z.object({ owner: z.string().trim().min(1).max(39), repo: z.string().trim().min(1).max(100) });
+const ownerSlug = z.string().trim().min(1).max(39).regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/);
+const repositorySlug = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9._-]+$/).refine((value) => value !== "." && value !== "..");
+const repoId = z.object({ owner: ownerSlug, repo: repositorySlug });
 const numberId = repoId.extend({ number: z.coerce.number().int().positive() });
 
 export const githubArgsSchema: Record<GitHubOp, z.ZodTypeAny> = {

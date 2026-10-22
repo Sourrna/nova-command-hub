@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
 import {
   exportWorkspace,
   importWorkspace,
   actions,
   readState,
+  useNova,
 } from "@/lib/nova/store";
 import { buildPlan } from "@/lib/nova/orchestrator";
 
@@ -69,6 +71,7 @@ describe("importWorkspace", () => {
       state: "failed",
       completedAt: Date.now(),
     });
+
     const raw = exportWorkspace();
 
     actions.reset();
@@ -107,5 +110,23 @@ describe("importWorkspace", () => {
     expect(r.ok).toBe(true);
     const s = readState();
     expect(JSON.stringify(s)).not.toContain("sk-123");
+  });
+});
+
+describe("workspace storage synchronization", () => {
+  it("updates mounted consumers when another browser tab persists workspace changes", async () => {
+    const { result } = renderHook(() => useNova((state) => state.content.map((item) => item.title)));
+    const nextState = {
+      ...readState(),
+      content: [{ id: "remote-item", title: "Saved in another tab", channel: "Notion", stage: "draft", notes: "", updated: Date.now() }],
+    };
+    localStorage.setItem("nova-brand-os-v1", JSON.stringify(nextState));
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: "nova-brand-os-v1",
+      newValue: JSON.stringify(nextState),
+      storageArea: localStorage,
+    }));
+
+    await waitFor(() => expect(result.current).toContain("Saved in another tab"));
   });
 });

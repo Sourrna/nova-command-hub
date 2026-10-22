@@ -88,11 +88,12 @@ export function buildPlan(goal: string): ExecutionPlan {
   const g = goal.toLowerCase();
   const steps: PlannedStep[] = [];
   const has = (kw: string) => g.includes(kw);
+  const mentionsGitHubRead = /\b(github|repos?|repositories|issues?|pull requests?|prs?|branches?|commits?)\b/.test(g);
 
   if (has("draft") || has("write") || has("content") || has("post") || has("publish")) {
     steps.push({ id: "s1-generate", kind: "generate", title: "Draft content from goal", connector: "openai", gated: false, dependsOn: [] });
   }
-  if (has("github") || has("repo") || has("issue") || has("pr")) {
+  if (mentionsGitHubRead) {
     steps.push({ id: "s2-github", kind: "read", title: "Read GitHub context", connector: "github", gated: false, dependsOn: [] });
   }
   if (has("notion") || has("calendar") || has("notes") || has("database")) {

@@ -26,6 +26,12 @@ describe("buildPlan", () => {
     expect(p.steps.some((s) => s.connector === "github" && s.kind === "read")).toBe(true);
   });
 
+  it("routes branch and commit reads without AI and does not treat project as a GitHub PR", () => {
+    expect(buildPlan("List branches").steps.some((step) => step.connector === "github" && step.kind === "read")).toBe(true);
+    expect(buildPlan("Show recent commits").steps.some((step) => step.connector === "github" && step.kind === "read")).toBe(true);
+    expect(buildPlan("Draft a project update").steps.some((step) => step.connector === "github")).toBe(false);
+  });
+
   it("falls back to an analysis step for an unrelated goal", () => {
     const p = buildPlan("hello world");
     expect(p.steps.length).toBe(1);

@@ -22,3 +22,51 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+### Server-side connector configuration
+
+Connector credentials are read by server-side adapters only. Do not add them to
+`VITE_*` variables, browser storage, or checked-in files. Configure the
+following as server environment secrets, then re-check connector health:
+
+| Variable | Capability |
+| --- | --- |
+| `OPENAI_API_KEY` | Live-verified OpenAI model access and draft generation |
+| `XAI_API_KEY` | Live-verified xAI model access and draft generation |
+| `NOTION_API_KEY` | Live Notion search/read access |
+| `GITHUB_API_KEY` | Optional GitHub API authentication; public repository reads also work unauthenticated with lower rate limits |
+| `LOVABLE_API_KEY` | Optional Lovable GitHub connector gateway; used with `GITHUB_API_KEY` |
+| `LINKEDIN_ACCESS_TOKEN` | Live LinkedIn organization/read access when the token has the required API permissions |
+
+### Current capability and data boundaries
+
+- Command Center supports AI draft generation and GitHub repository, open issue,
+  pull request, branch, and commit reads. GitHub issue and pull-request goals
+  route to their corresponding read operation; a specific issue or PR number
+  requests that item. Goals default to `Sourrna/nova-brand-ai` unless an
+  `owner/repo` value or GitHub repository URL is provided. Provider results and
+  failures are recorded in the local execution history.
+- GitHub issue/branch/PR creation is not implemented and is not offered as an
+  available capability.
+- Notion search and LinkedIn organization reads use server-side credentials.
+  Connector health is reported as connected only after the adapter's live read
+  succeeds.
+- Notion page writes and LinkedIn publishing remain disabled. The application
+  does not have a shared atomic approval store or authenticated user/ownership
+  context, so a local approval record cannot authorize a provider write.
+  Provisioning a database or Durable Object alone is insufficient: the durable
+  grant/consume/revoke path and authenticated request ownership must also be
+  implemented and verified before enabling these actions.
+- Tasks, drafts, projects, executions, approval requests, and activity history
+  are persisted in this browser's local storage. They survive refreshes and
+  remounts and synchronize across tabs in the same browser profile; they are
+  not shared across users, devices, or browser profiles. Use Settings > Backup
+  & restore to export or import a workspace.
+
+### Verification
+
+```sh
+npm test
+npx tsc --noEmit
+npm run build
+```

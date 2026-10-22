@@ -15,6 +15,7 @@ const commandMocks = vi.hoisted(() => ({
   notionExecute: Symbol("notionExecute"),
   notionGrant: Symbol("notionGrant"),
   notionRevoke: Symbol("notionRevoke"),
+  github: Symbol("github"),
   linkedinExecute: Symbol("linkedinExecute"),
   linkedinGrant: Symbol("linkedinGrant"),
   linkedinRevoke: Symbol("linkedinRevoke"),
@@ -27,6 +28,7 @@ const commandMocks = vi.hoisted(() => ({
   linkedinExecuteCall: vi.fn(),
   linkedinGrantCall: vi.fn(),
   linkedinRevokeCall: vi.fn(),
+  githubCall: vi.fn(),
   linkedinConnected: false,
 }));
 
@@ -56,11 +58,14 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
                     ? commandMocks.linkedinGrantCall
                     : fn === commandMocks.linkedinRevoke
                       ? commandMocks.linkedinRevokeCall
-                      : async () => ({ ok: false, error: "not used" }),
+                      : fn === commandMocks.github
+                        ? commandMocks.githubCall
+                        : async () => ({ ok: false, error: "not used" }),
   };
 });
 vi.mock("@/lib/nova/command.server", () => ({ interpretGoal: commandMocks.interpret }));
 vi.mock("@/lib/nova/ai.functions", () => ({ generateAi: commandMocks.generate }));
+vi.mock("@/lib/nova/github-control.server", () => ({ githubRead: commandMocks.github }));
 vi.mock("@/lib/nova/notion.functions", () => ({
   searchNotion: commandMocks.notion,
   executeNotionWrite: commandMocks.notionExecute,
@@ -107,6 +112,10 @@ beforeEach(() => {
   commandMocks.linkedinExecuteCall.mockReset();
   commandMocks.linkedinGrantCall.mockReset();
   commandMocks.linkedinRevokeCall.mockReset();
+  commandMocks.githubCall.mockReset().mockResolvedValue({
+    ok: true,
+    data: [{ number: 42, title: "Fix command issue", state: "open", html_url: "https://github.com/Sourrna/nova-brand-ai/issues/42" }],
+  });
   commandMocks.linkedinConnected = false;
 });
 
@@ -187,6 +196,32 @@ describe("command workspace — plan + execution", () => {
 
     renderPage();
     expect(await screen.findByText(/Full generated announcement\./)).toBeInTheDocument();
+  });
+
+  it("routes a GitHub issue review to the issues list and renders the actual read result", async () => {
+    commandMocks.interpretCall.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        objective: "Review open issues on GitHub",
+        intent: "research",
+        connectors: ["github"],
+        steps: [{ title: "Read GitHub issues", kind: "read", connector: "github", gated: false }],
+        needsApproval: false,
+        confidence: 0.9,
+      },
+    });
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Review open issues on GitHub" } });
+    fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
+    await screen.findByText(/Using validated AI plan/);
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+
+    expect(await screen.findByText(/GitHub returned 1 open issue\(s\): #42 Fix command issue/)).toBeInTheDocument();
+    expect(commandMocks.githubCall).toHaveBeenCalledWith({
+      data: { op: "issues.list", owner: "Sourrna", repo: "nova-brand-ai" },
+    });
+    expect(readState().executions[0]?.result.state).toBe("complete");
+    expect(JSON.stringify(readState().executions[0]?.result.steps[0]?.artifact)).toContain('"operation":"issues.list"');
   });
 
   it("keeps a gated Notion step pending and creates only a local approval request", async () => {

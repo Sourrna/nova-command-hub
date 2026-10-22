@@ -9,7 +9,8 @@ import { meta } from "@/lib/nova/meta";
 import { buildPlan, executePlan, planFromInterpretation, type ExecutionResult, type PlannedStep } from "@/lib/nova/orchestrator";
 import { interpretGoal } from "@/lib/nova/command.server";
 import { generateAi } from "@/lib/nova/ai.functions";
-import { getRepoSnapshot } from "@/lib/nova/github.functions";
+import { githubRead } from "@/lib/nova/github-control.server";
+import { normalizeGitHubCommandReadData, resolveGitHubCommandRead, summarizeGitHubCommandRead } from "@/lib/nova/github-command";
 import { searchNotion } from "@/lib/nova/notion.functions";
 import { getLinkedinSnapshot } from "@/lib/nova/linkedin.functions";
 import { useHealth } from "@/lib/nova/health";
@@ -41,6 +42,7 @@ export function CommandPage() {
 
   const doInterpret = useServerFn(interpretGoal);
   const doGen = useServerFn(generateAi);
+  const doGithubRead = useServerFn(githubRead);
   const doNotionSearch = useServerFn(searchNotion);
   const doLinkedinSnapshot = useServerFn(getLinkedinSnapshot);
   const linkedinReady = health.get("linkedin").status === "connected";
@@ -125,9 +127,14 @@ export function CommandPage() {
       }
       if (s.kind === "read" && s.connector === "github") {
         handlers[s.id] = async () => {
-          const res = await getRepoSnapshot();
+          const request = resolveGitHubCommandRead(plan.goal);
+          const res = await doGithubRead({ data: request });
           if (!res.ok) throw new Error(res.error ?? "GitHub read failed");
-          return { summary: `${res.repo}: ${res.info?.stars ?? 0} ★ · ${res.info?.openIssues ?? 0} open · ${res.commits.length} recent commits`, artifact: { source: "github", ...res } };
+          const data = normalizeGitHubCommandReadData(request.op, res.data);
+          return {
+            summary: summarizeGitHubCommandRead(request.op, data),
+            artifact: { source: "github", operation: request.op, data },
+          };
         };
       }
       if (s.kind === "read" && s.connector === "notion") {

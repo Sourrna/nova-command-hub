@@ -126,6 +126,13 @@ let state: NovaState | null = null;
 const listeners = new Set<() => void>();
 const serverSnapshot = seed();
 
+function handleStorage(event: StorageEvent) {
+  if (event.key !== KEY && event.key !== null) return;
+  state = null;
+  load();
+  listeners.forEach((listener) => listener());
+}
+
 function load(): NovaState {
   if (state) return state;
   try { const raw = localStorage.getItem(KEY); state = raw ? { ...seed(), ...JSON.parse(raw) } : seed(); }
@@ -144,7 +151,14 @@ export function update(fn: (s: NovaState) => Partial<NovaState>, logMsg?: string
 
 export function useNova<T>(sel: (s: NovaState) => T): T {
   return sel(useSyncExternalStore(
-    (l) => { listeners.add(l); return () => listeners.delete(l); },
+    (l) => {
+      listeners.add(l);
+      if (typeof window !== "undefined") window.addEventListener("storage", handleStorage);
+      return () => {
+        listeners.delete(l);
+        if (listeners.size === 0 && typeof window !== "undefined") window.removeEventListener("storage", handleStorage);
+      };
+    },
     () => load(),
     () => serverSnapshot,
   ));
