@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen">
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-40 w-64 border-e bg-sidebar backdrop-blur-xl transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
+          "fixed inset-y-0 start-0 z-40 w-64 border-e bg-sidebar backdrop-blur-2xl transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full",
         )}
         aria-label="Primary"
@@ -51,19 +51,22 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex h-14 items-center justify-between border-b px-4">
           <Link to="/" className="flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded-full border border-accent bg-primary font-mono text-xs panel-glow">N</span>
-            <span className="font-mono text-sm tracking-[0.2em] text-silver">NOVA·OS</span>
+            <div className="flex flex-col leading-tight">
+              <span className="font-mono text-xs tracking-[0.24em] text-silver">NOVA</span>
+              <span className="font-mono text-[0.5rem] tracking-[0.32em] text-muted-foreground">COMMAND</span>
+            </div>
           </Link>
           <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu"><X size={16} /></button>
         </div>
-        <nav className="h-[calc(100vh-3.5rem)] overflow-y-auto p-3">
+        <nav className="h-[calc(100vh-3.5rem)] overflow-y-auto p-3 scrollbar-thin">
           {NAV.map((g) => (
-            <div key={g.group} className="mb-4">
+            <div key={g.group} className="mb-5">
               <p className="label-hud px-2 pb-1">{t(g.group)}</p>
               {g.items.map(({ to, label, icon: Icon }) => {
                 const active = to === "/" ? path === "/" : path.startsWith(to);
                 return (
                   <Link key={to} to={to}
-                    className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent",
+                    className={cn("flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent",
                       active && "bg-sidebar-accent text-silver shadow-[inset_2px_0_0_var(--accent)]")}>
                     <Icon size={16} />{t(label)}
                   </Link>
@@ -74,19 +77,22 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
       </aside>
       {open && <div className="fixed inset-0 z-30 bg-background/70 lg:hidden" onClick={() => setOpen(false)} />}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/70 px-4 backdrop-blur-xl">
-          <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={16} /></button>
-          <span className="label-hud hidden sm:inline">Personal Brand Ops · MVP · local workspace</span>
-          <div className="ms-auto flex items-center gap-2">
-            <Link to="/activity" className="btn btn-ghost" aria-label={`${pending} pending approvals`}>
-              <ShieldCheck size={15} /> <span className="font-mono text-xs">{pending}</span>
-            </Link>
-            <span className="chip text-ok"><span className="dot" />ONLINE</span>
-          </div>
-        </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6">{children}</main>
-      </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/60 px-4 backdrop-blur-2xl">
+            <button className="btn btn-ghost lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={16} /></button>
+            <div className="hidden items-center gap-2 sm:flex">
+              <span className="grid h-6 w-6 place-items-center rounded-full border border-accent/70 bg-primary/80 font-mono text-[0.6rem] panel-glow">N</span>
+              <span className="label-hud">NOVA COMMAND INTERFACE · YEAR 3088</span>
+            </div>
+            <div className="ms-auto flex items-center gap-2">
+              <Link to="/activity" className="btn btn-ghost" aria-label={`${pending} pending approvals`}>
+                <ShieldCheck size={15} /> <span className="font-mono text-xs">{pending}</span>
+              </Link>
+              <span className="chip text-ok glow-pulse"><span className="dot" />ONLINE</span>
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        </div>
     </div>
   );
 }

@@ -20,6 +20,11 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Local scratch and staging artifacts (not part of the project)
+nova-speckit-staging/
+AGENTS.md.pre-speckit.bak
+src/lib/nova/_probe*.ts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

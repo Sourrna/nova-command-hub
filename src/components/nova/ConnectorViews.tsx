@@ -30,6 +30,10 @@ export function ConnectorCard({ c }: { c: ConnectorDef }) {
   );
 }
 
+const LIVE_ADAPTER: Record<ConnectorId, boolean> = {
+  openai: true, xai: true, notion: true, github: true, linkedin: true, lovable: false,
+};
+
 export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.ReactNode }) {
   const c = getConnector(id);
   const health = useHealth();
@@ -37,6 +41,7 @@ export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.Re
   const qc = useQueryClient();
   const disabled = useNova((s) => s.disabled.includes(id));
   const log = useNova((s) => s.log.filter((l) => l.message.toLowerCase().includes((c.name.split(" ")[0] ?? c.name).toLowerCase())).slice(0, 6));
+  const hasLiveAdapter = LIVE_ADAPTER[id];
 
   return (
     <div className="space-y-4">
@@ -68,11 +73,15 @@ export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.Re
           {c.capabilities.map((cap) => (
             <li key={cap.label} className="flex items-center justify-between rounded-md border p-3 text-sm">
               <span>{cap.label}</span>
-              <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><span className="chip text-idle text-xs">{c.category === "ai" ? (h.status === "connected" ? "Live — use Generate" : "Unavailable until verified") : c.id === "github" && cap.kind === "read" ? (h.status === "connected" ? "Live" : "Unavailable until verified") : "Adapter not implemented"}</span></span>
+              <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><span className="chip text-idle text-xs">{hasLiveAdapter ? (h.status === "connected" ? "Live" : "Unavailable until verified") : "Adapter not implemented"}</span></span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-muted-foreground">{c.category === "ai" ? "Status is verified with a live authenticated API call." : "Live adapter not implemented in this MVP; gated actions are logged and blocked rather than simulated."}</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {hasLiveAdapter
+            ? "Status is verified with a live API call; gated actions are logged and blocked rather than simulated."
+            : "Live adapter not implemented in this MVP; gated actions are logged and blocked rather than simulated."}
+        </p>
       </Panel>
       {demo && <Panel title="Preview" action={<DemoTag />}>{demo}</Panel>}
       <Panel title="Recent operations">

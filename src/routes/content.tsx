@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Send, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, Trash2, Sparkles } from "lucide-react";
 import { actions, STAGES, useNova, type ContentItem } from "@/lib/nova/store";
 import { PageHeader, Panel, Empty, DemoTag } from "@/components/nova/ui";
+import { AiGenerator } from "@/components/nova/AiGenerator";
 import { meta } from "@/lib/nova/meta";
 
 export const Route = createFileRoute("/content")({
@@ -17,6 +18,7 @@ function Studio() {
   const [channel, setChannel] = useState("LinkedIn");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
+  const [drafting, setDrafting] = useState(false);
   const shown = items.filter((c) => c.title.toLowerCase().includes(q.toLowerCase()) && (filter === "all" || c.channel === filter));
 
   const move = (c: ContentItem, dir: 1 | -1) => {
@@ -33,7 +35,13 @@ function Studio() {
 
   return (
     <>
-      <PageHeader kicker="Pipeline" title="Content Studio" />
+      <PageHeader kicker="Pipeline" title="Content Studio">
+        <button className="btn btn-ghost" onClick={() => setDrafting((d) => !d)}>
+          <Sparkles size={14} />{drafting ? "Hide generator" : "Draft from AI"}
+        </button>
+      </PageHeader>
+      {drafting && <AiGenerator onDraft={(title, body) => { actions.addContent(title, channel, body); setDrafting(false); }} />}
+
       <Panel>
         <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); if (title.trim()) { actions.addContent(title.trim(), channel); setTitle(""); } }}>
           <input className="field flex-1 min-w-48" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New idea" aria-label="New idea" />

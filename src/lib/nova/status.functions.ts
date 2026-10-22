@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { CONNECTORS, type ConnectorId, type ConnectorStatus } from "./connectors";
 import { testProvider } from "./ai.server";
+import { notionSearch } from "./notion.server";
+import { linkedinOrganizations } from "./linkedin.server";
 
 export interface ConnectorHealth {
   id: ConnectorId;
@@ -9,8 +11,10 @@ export interface ConnectorHealth {
   missing: string[];
 }
 
-// AI connectors are verified with a live authenticated call; "connected" only on success.
-// Others: presence check only — never reported connected without a live adapter.
+// AI and Notion connectors are verified with a live authenticated call;
+// "connected" only on success. GitHub and LinkedIn are verified via their
+// adapters. Others: presence check only — never reported connected without
+// a live adapter.
 export const getConnectorHealth = createServerFn({ method: "GET" }).handler(async () => {
   return Promise.all(CONNECTORS.map<Promise<ConnectorHealth>>(async (c) => {
     if (c.id === "lovable")
@@ -28,6 +32,16 @@ export const getConnectorHealth = createServerFn({ method: "GET" }).handler(asyn
     if (c.id === "openai" || c.id === "xai") {
       const r = await testProvider(c.id, process.env[c.secrets[0]!]);
       if (r.ok) return { id: c.id, status: "connected", reason: "Verified by a live API call.", missing: [] };
+      return { id: c.id, status: r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: [] };
+    }
+    if (c.id === "notion") {
+      const r = await notionSearch("Nova");
+      if (r.ok) return { id: c.id, status: "connected", reason: "Verified by a live Notion search.", missing: [] };
+      return { id: c.id, status: r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: [] };
+    }
+    if (c.id === "linkedin") {
+      const r = await linkedinOrganizations();
+      if (r.ok) return { id: c.id, status: "connected", reason: "Verified by a live LinkedIn organizations call.", missing: [] };
       return { id: c.id, status: r.code === "auth" ? "disconnected" : "limited", reason: r.error, missing: [] };
     }
     return { id: c.id, status: "limited", reason: "Credential present; live adapter not implemented yet.", missing: [] };

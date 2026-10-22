@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { actions, useNova } from "@/lib/nova/store";
+import { useState } from "react";
+import { actions, useNova, exportWorkspace, importWorkspace } from "@/lib/nova/store";
 import { PageHeader, Panel } from "@/components/nova/ui";
 import { meta } from "@/lib/nova/meta";
 
@@ -10,6 +11,26 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const lang = useNova((s) => s.lang);
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function doExport() {
+    const blob = new Blob([exportWorkspace()], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nova-workspace-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function doImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const r = importWorkspace(text);
+    setImportMsg(r.ok ? { ok: true, text: "Workspace imported." } : { ok: false, text: r.error });
+  }
+
   return (
     <>
       <PageHeader kicker="Workspace" title="Settings" />
@@ -27,6 +48,19 @@ function SettingsPage() {
             <button className="btn" onClick={() => actions.clearDemo()}>Remove demo data</button>
             <button className="btn" onClick={() => { if (confirm("Reset the entire workspace? This cannot be undone.")) actions.reset(); }}>Reset workspace</button>
           </div>
+        </Panel>
+        <Panel title="Backup & restore" className="md:col-span-2">
+          <p className="text-sm text-muted-foreground">Export a JSON snapshot of your local workspace, or restore one. Snapshots contain only your local data — never secrets or tokens.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="btn btn-primary" onClick={doExport}>Export JSON</button>
+            <label className="btn cursor-pointer">
+              Import JSON
+              <input type="file" accept="application/json,.json" className="hidden" onChange={doImport} />
+            </label>
+          </div>
+          {importMsg && (
+            <p className={`mt-2 text-sm ${importMsg.ok ? "text-ok" : "text-destructive"}`}>{importMsg.text}</p>
+          )}
         </Panel>
         <Panel title="Secrets" className="md:col-span-2">
           <p className="text-sm text-muted-foreground">API keys are never entered or stored here. Add them as server-side secrets (OPENAI_API_KEY, XAI_API_KEY, NOTION_API_KEY, GITHUB_TOKEN, LINKEDIN_ACCESS_TOKEN), then re-check status on each connector page.</p>

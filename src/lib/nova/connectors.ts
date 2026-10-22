@@ -58,8 +58,14 @@ export const CONNECTORS: ConnectorDef[] = [
       { kind: "read", label: "Read repos & issues", gated: false },
       { kind: "write", label: "Open issues / PRs", gated: true },
     ],
-    secrets: [],
-    setup: ["Linked via the Lovable GitHub connector (server-side only)", "Reads Sourrna/nova-brand-ai; writes not implemented"],
+    secrets: ["GITHUB_API_KEY"],
+    setup: [
+      "Create a fine-grained personal access token with read-only repo scope at github.com/settings/tokens",
+      "Add it as server secret GITHUB_API_KEY",
+      "On Lovable: also set LOVABLE_API_KEY so the connector uses the Lovable gateway",
+      "On local dev: GITHUB_API_KEY alone is enough — the adapter falls back to the direct GitHub REST API",
+      "Re-check status here",
+    ],
     docs: "https://docs.github.com/rest",
   },
   {

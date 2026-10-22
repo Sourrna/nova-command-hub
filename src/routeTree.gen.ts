@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as CommandRouteImport } from './routes/command'
 import { Route as ContentRouteImport } from './routes/content'
 import { Route as CoreRouteImport } from './routes/core'
 import { Route as GithubRouteImport } from './routes/github'
+import { Route as GithubControlRouteImport } from './routes/github-control'
 import { Route as LinkedinRouteImport } from './routes/linkedin'
 import { Route as LovableRouteImport } from './routes/lovable'
 import { Route as MemoryRouteImport } from './routes/memory'
@@ -33,6 +35,11 @@ const ActivityRoute = ActivityRouteImport.update({
   path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommandRoute = CommandRouteImport.update({
+  id: '/command',
+  path: '/command',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContentRoute = ContentRouteImport.update({
   id: '/content',
   path: '/content',
@@ -46,6 +53,11 @@ const CoreRoute = CoreRouteImport.update({
 const GithubRoute = GithubRouteImport.update({
   id: '/github',
   path: '/github',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GithubControlRoute = GithubControlRouteImport.update({
+  id: '/github-control',
+  path: '/github-control',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LinkedinRoute = LinkedinRouteImport.update({
@@ -92,9 +104,11 @@ const SettingsRoute = SettingsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/command': typeof CommandRoute
   '/content': typeof ContentRoute
   '/core': typeof CoreRoute
   '/github': typeof GithubRoute
+  '/github-control': typeof GithubControlRoute
   '/linkedin': typeof LinkedinRoute
   '/lovable': typeof LovableRoute
   '/memory': typeof MemoryRoute
@@ -107,9 +121,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/command': typeof CommandRoute
   '/content': typeof ContentRoute
   '/core': typeof CoreRoute
   '/github': typeof GithubRoute
+  '/github-control': typeof GithubControlRoute
   '/linkedin': typeof LinkedinRoute
   '/lovable': typeof LovableRoute
   '/memory': typeof MemoryRoute
@@ -123,9 +139,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/command': typeof CommandRoute
   '/content': typeof ContentRoute
   '/core': typeof CoreRoute
   '/github': typeof GithubRoute
+  '/github-control': typeof GithubControlRoute
   '/linkedin': typeof LinkedinRoute
   '/lovable': typeof LovableRoute
   '/memory': typeof MemoryRoute
@@ -140,9 +158,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/command'
     | '/content'
     | '/core'
     | '/github'
+    | '/github-control'
     | '/linkedin'
     | '/lovable'
     | '/memory'
@@ -155,9 +175,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/command'
     | '/content'
     | '/core'
     | '/github'
+    | '/github-control'
     | '/linkedin'
     | '/lovable'
     | '/memory'
@@ -170,9 +192,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/command'
     | '/content'
     | '/core'
     | '/github'
+    | '/github-control'
     | '/linkedin'
     | '/lovable'
     | '/memory'
@@ -186,9 +210,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  CommandRoute: typeof CommandRoute
   ContentRoute: typeof ContentRoute
   CoreRoute: typeof CoreRoute
   GithubRoute: typeof GithubRoute
+  GithubControlRoute: typeof GithubControlRoute
   LinkedinRoute: typeof LinkedinRoute
   LovableRoute: typeof LovableRoute
   MemoryRoute: typeof MemoryRoute
@@ -215,6 +241,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/command': {
+      id: '/command'
+      path: '/command'
+      fullPath: '/command'
+      preLoaderRoute: typeof CommandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/content': {
       id: '/content'
       path: '/content'
@@ -234,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/github'
       fullPath: '/github'
       preLoaderRoute: typeof GithubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/github-control': {
+      id: '/github-control'
+      path: '/github-control'
+      fullPath: '/github-control'
+      preLoaderRoute: typeof GithubControlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/linkedin': {
@@ -298,9 +338,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  CommandRoute: CommandRoute,
   ContentRoute: ContentRoute,
   CoreRoute: CoreRoute,
   GithubRoute: GithubRoute,
+  GithubControlRoute: GithubControlRoute,
   LinkedinRoute: LinkedinRoute,
   LovableRoute: LovableRoute,
   MemoryRoute: MemoryRoute,

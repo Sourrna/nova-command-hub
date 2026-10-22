@@ -14,9 +14,9 @@ export function PageHeader({ kicker, title, children }: { kicker: string; title:
   );
 }
 
-export function Panel({ title, action, className, children }: { title?: string; action?: ReactNode; className?: string; children: ReactNode }) {
+export function Panel({ title, action, className, children, glow }: { title?: string; action?: ReactNode; className?: string; children: ReactNode; glow?: boolean }) {
   return (
-    <section className={cn("panel p-4", className)}>
+    <section className={cn("panel p-4 scanline", glow && "panel-glow glow-pulse", className)}>
       {title && (
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="label-hud">{title}</h2>

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "notion": {
+      "type": "remote",
+      "url": "https://mcp.notion.com/mcp",
+      "enabled": true
+    },
+    "ruflo": {
+      "type": "local",
+      "command": ["cmd", "/c", "npx", "-y", "ruflo@latest", "mcp", "start"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}
