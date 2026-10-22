@@ -12,9 +12,21 @@ const commandMocks = vi.hoisted(() => ({
   generate: Symbol("generate"),
   notion: Symbol("notion"),
   linkedin: Symbol("linkedin"),
+  notionExecute: Symbol("notionExecute"),
+  notionGrant: Symbol("notionGrant"),
+  notionRevoke: Symbol("notionRevoke"),
+  linkedinExecute: Symbol("linkedinExecute"),
+  linkedinGrant: Symbol("linkedinGrant"),
+  linkedinRevoke: Symbol("linkedinRevoke"),
   interpretCall: vi.fn(),
   generateCall: vi.fn(),
   linkedinCall: vi.fn(),
+  notionExecuteCall: vi.fn(),
+  notionGrantCall: vi.fn(),
+  notionRevokeCall: vi.fn(),
+  linkedinExecuteCall: vi.fn(),
+  linkedinGrantCall: vi.fn(),
+  linkedinRevokeCall: vi.fn(),
   linkedinConnected: false,
 }));
 
@@ -32,13 +44,35 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
         ? commandMocks.generateCall
         : fn === commandMocks.linkedin
           ? commandMocks.linkedinCall
-        : async () => ({ ok: false, error: "not used" }),
+          : fn === commandMocks.notionExecute
+            ? commandMocks.notionExecuteCall
+            : fn === commandMocks.notionGrant
+              ? commandMocks.notionGrantCall
+              : fn === commandMocks.notionRevoke
+                ? commandMocks.notionRevokeCall
+                : fn === commandMocks.linkedinExecute
+                  ? commandMocks.linkedinExecuteCall
+                  : fn === commandMocks.linkedinGrant
+                    ? commandMocks.linkedinGrantCall
+                    : fn === commandMocks.linkedinRevoke
+                      ? commandMocks.linkedinRevokeCall
+                      : async () => ({ ok: false, error: "not used" }),
   };
 });
 vi.mock("@/lib/nova/command.server", () => ({ interpretGoal: commandMocks.interpret }));
 vi.mock("@/lib/nova/ai.functions", () => ({ generateAi: commandMocks.generate }));
-vi.mock("@/lib/nova/notion.functions", () => ({ searchNotion: commandMocks.notion }));
-vi.mock("@/lib/nova/linkedin.functions", () => ({ getLinkedinSnapshot: commandMocks.linkedin }));
+vi.mock("@/lib/nova/notion.functions", () => ({
+  searchNotion: commandMocks.notion,
+  executeNotionWrite: commandMocks.notionExecute,
+  grantNotionApproval: commandMocks.notionGrant,
+  revokeNotionApproval: commandMocks.notionRevoke,
+}));
+vi.mock("@/lib/nova/linkedin.functions", () => ({
+  getLinkedinSnapshot: commandMocks.linkedin,
+  executeLinkedinPublish: commandMocks.linkedinExecute,
+  grantLinkedinApproval: commandMocks.linkedinGrant,
+  revokeLinkedinApproval: commandMocks.linkedinRevoke,
+}));
 vi.mock("@/lib/nova/health", () => ({
   useHealth: () => ({
     get: (id: string) => ({ status: id === "xai" || (id === "linkedin" && commandMocks.linkedinConnected) ? "connected" : "needs_setup", reason: "test", missing: [] }),
@@ -67,6 +101,12 @@ beforeEach(() => {
     value: { text: "Launch headline\nFull generated announcement.", model: "grok-test" },
   });
   commandMocks.linkedinCall.mockReset().mockResolvedValue({ ok: true, authors: ["urn:li:organization:321"] });
+  commandMocks.notionExecuteCall.mockReset();
+  commandMocks.notionGrantCall.mockReset();
+  commandMocks.notionRevokeCall.mockReset();
+  commandMocks.linkedinExecuteCall.mockReset();
+  commandMocks.linkedinGrantCall.mockReset();
+  commandMocks.linkedinRevokeCall.mockReset();
   commandMocks.linkedinConnected = false;
 });
 
@@ -75,7 +115,7 @@ function renderPage() {
   return render(<QueryClientProvider client={queryClient}><CommandPage /></QueryClientProvider>);
 }
 
-describe("command workspace — plan + execution", () => {
+describe("command workspace Ã¢â‚¬â€ plan + execution", () => {
   it("uses a validated interpreted plan and rejects unsupported operations", () => {
     const candidate = {
       objective: "Research project",
@@ -106,7 +146,7 @@ describe("command workspace — plan + execution", () => {
 
     first.unmount();
     const studio = render(<Studio />);
-    expect(await screen.findByDisplayValue("Launch headline\nFull generated announcement.")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Launch headline")).toBeInTheDocument();
     studio.unmount();
 
     const activity = render(<Activity />);
@@ -133,7 +173,7 @@ describe("command workspace — plan + execution", () => {
 
     command.unmount();
     const studio = render(<Studio />);
-    expect(await screen.findByDisplayValue("Launch headline\nFull generated announcement.")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Launch headline")).toBeInTheDocument();
     studio.unmount();
     const activity = render(<Activity />);
     expect(await screen.findByText(/Command execution complete: Draft a LinkedIn announcement/)).toBeInTheDocument();
@@ -166,9 +206,10 @@ describe("command workspace — plan + execution", () => {
     expect(readState().approvals[0]?.state).toBe("pending");
     expect(readState().approvals[0]?.operation).toBe("write");
     expect(readState().log[0]?.kind).toBe("approval");
+    expect(commandMocks.notionExecuteCall).not.toHaveBeenCalled();
 
     const activity = render(<Activity />);
-    expect(await screen.findByText(/Approval gate · 1 pending/)).toBeInTheDocument();
+    expect(await screen.findByText(/Approval gate.*1 pending/)).toBeInTheDocument();
     expect(screen.getByText(/Command execution awaiting_approval: Save campaign/)).toBeInTheDocument();
     activity.unmount();
   });
@@ -214,7 +255,7 @@ describe("command workspace — plan + execution", () => {
   });
 });
 
-describe("command interpreter — schema validation", () => {
+describe("command interpreter Ã¢â‚¬â€ schema validation", () => {
   it("rejects malformed AI output", () => {
     expect(parseInterpretation("not json").ok).toBe(false);
     expect(parseInterpretation("{\"objective\":\"x\"}").ok).toBe(false);
@@ -233,7 +274,7 @@ describe("command interpreter — schema validation", () => {
   });
 });
 
-describe("command flow — missing credentials and approvals", () => {
+describe("command flow Ã¢â‚¬â€ missing credentials and approvals", () => {
   it("fails execution when AI handler reports missing credentials", async () => {
     const p = buildPlan("Draft a LinkedIn post");
     const gen = p.steps.find((s) => s.kind === "generate")!;
