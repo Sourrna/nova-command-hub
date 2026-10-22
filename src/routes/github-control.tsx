@@ -5,7 +5,7 @@ import { GitBranch, GitPullRequest, AlertCircle, FileText, RefreshCw } from "luc
 import { PageHeader, Panel, Empty } from "@/components/nova/ui";
 import { meta } from "@/lib/nova/meta";
 import { githubRead } from "@/lib/nova/github-control.server";
-import { GH_REPO_DEFAULT, splitRepo } from "@/lib/nova/github-capabilities";
+import { GH_REPO_DEFAULT, githubCaps, splitRepo } from "@/lib/nova/github-capabilities";
 import { useHealth } from "@/lib/nova/health";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,12 @@ export const Route = createFileRoute("/github-control")({
 });
 
 type Tab = "overview" | "branches" | "issues" | "pulls" | "commits";
+
+export const GITHUB_CONTROL_CAPABILITIES = Object.values(githubCaps).map(({ op, authz, implemented }) => ({
+  operation: op,
+  access: authz,
+  implemented,
+}));
 
 function GitHubControlPage() {
   const [repo, setRepo] = useState(GH_REPO_DEFAULT);
@@ -104,16 +110,16 @@ function GitHubControlPage() {
         </Panel>
         <Panel title="Capability registry" className="lg:col-span-4">
           <ul className="space-y-2 text-sm">
-            <li className="flex items-center justify-between"><span>repo.get</span><span className="label-hud">read</span></li>
-            <li className="flex items-center justify-between"><span>branches.list</span><span className="label-hud">read</span></li>
-            <li className="flex items-center justify-between"><span>issues.list/get</span><span className="label-hud">read</span></li>
-            <li className="flex items-center justify-between"><span>prs.list/get</span><span className="label-hud">read</span></li>
-            <li className="flex items-center justify-between"><span>commits.list</span><span className="label-hud">read</span></li>
-            <li className="flex items-center justify-between"><span>issues.create</span><span className="label-hud text-warn">write · approval</span></li>
-            <li className="flex items-center justify-between"><span>branches.create</span><span className="label-hud text-warn">write · approval</span></li>
-            <li className="flex items-center justify-between"><span>prs.create</span><span className="label-hud text-warn">write · approval</span></li>
+            {GITHUB_CONTROL_CAPABILITIES.map((capability) => (
+              <li key={capability.operation} className="flex items-center justify-between">
+                <span>{capability.operation}</span>
+                <span className={`label-hud ${capability.implemented ? "" : "text-muted-foreground"}`}>
+                  {capability.implemented ? capability.access : "not implemented"}
+                </span>
+              </li>
+            ))}
           </ul>
-          <p className="mt-3 text-xs text-muted-foreground">Writes require server-side approval, payload binding, and valid repo permissions.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Repository reads use the GitHub API. GitHub writes are unavailable; no issue, branch, or pull request is created here.</p>
         </Panel>
       </div>
     </>

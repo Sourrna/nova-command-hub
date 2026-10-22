@@ -19,6 +19,7 @@ export interface GitHubCapability {
   method: "GET" | "POST";
   path: (args: any) => string;
   authz: AuthzClass;
+  implemented: boolean;
   requires: { token?: boolean; scopes?: string[] };
   approvalRequired: boolean;
   description: string;
@@ -33,6 +34,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo }) => `repos/${owner}/${repo}`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "Repository metadata",
@@ -43,6 +45,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/branches?per_page=30`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "List branches",
@@ -53,6 +56,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/issues?state=${encodeURIComponent("open")}&per_page=30`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "List open issues",
@@ -63,6 +67,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo, number }) => `repos/${owner}/${repo}/issues/${number}`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "Get issue details",
@@ -73,6 +78,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/pulls?state=${encodeURIComponent("open")}&per_page=30`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "List open pull requests",
@@ -83,6 +89,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo, number }) => `repos/${owner}/${repo}/pulls/${number}`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "Get pull request details",
@@ -93,6 +100,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "GET",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/commits?per_page=30`,
     authz: "read",
+    implemented: true,
     requires: { token: false },
     approvalRequired: false,
     description: "List recent commits",
@@ -103,6 +111,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "POST",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/issues`,
     authz: "write",
+    implemented: false,
     requires: { token: true, scopes: ["repo"] },
     approvalRequired: true,
     description: "Create an issue",
@@ -113,6 +122,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "POST",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/git/refs`,
     authz: "write",
+    implemented: false,
     requires: { token: true, scopes: ["repo"] },
     approvalRequired: true,
     description: "Create a branch (ref)",
@@ -123,6 +133,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "POST",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/pulls`,
     authz: "write",
+    implemented: false,
     requires: { token: true, scopes: ["repo"] },
     approvalRequired: true,
     description: "Create a pull request",

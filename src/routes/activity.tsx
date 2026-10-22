@@ -4,6 +4,7 @@ import { Check, X, Loader2, AlertTriangle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { actions, useNova, type LogEntry } from "@/lib/nova/store";
 import { useHealth } from "@/lib/nova/health";
+import { DURABLE_APPROVAL_STORE_CONFIGURED } from "@/lib/nova/approval-config";
 import type { ConnectorId } from "@/lib/nova/connectors";
 import { executeNotionWrite, grantNotionApproval, revokeNotionApproval } from "@/lib/nova/notion.functions";
 import { executeLinkedinPublish, grantLinkedinApproval, revokeLinkedinApproval } from "@/lib/nova/linkedin.functions";
@@ -127,9 +128,13 @@ export function Activity() {
                 <span className="flex-1">{a.action} <span className="label-hud">→ {a.target}</span></span>
                 {a.state === "pending" ? (
                   <>
-                    <button className="btn btn-primary" disabled={busy[a.id] || (!!approvalHandlerFor(a.connector, a.operation) && !ready(a.connector))} onClick={() => approve(a)}>
-                      {busy[a.id] ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{busy[a.id] ? "Writing…" : "Approve"}
-                    </button>
+                    {DURABLE_APPROVAL_STORE_CONFIGURED ? (
+                      <button className="btn btn-primary" disabled={busy[a.id] || (!!approvalHandlerFor(a.connector, a.operation) && !ready(a.connector))} onClick={() => approve(a)}>
+                        {busy[a.id] ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{busy[a.id] ? "Writing…" : "Approve"}
+                      </button>
+                    ) : (
+                      <span className="chip text-warn" title="Configure the shared durable approval store to enable writes">Write unavailable</span>
+                    )}
                     <button className="btn" onClick={() => reject(a)} disabled={busy[a.id]}><X size={14} />Reject</button>
                   </>
                 ) : (
@@ -145,7 +150,7 @@ export function Activity() {
             ))}
           </ul>
         ) : <Empty title="No approval requests" hint="Publish and write actions will appear here before anything runs." />}
-        <p className="mt-3 text-xs text-muted-foreground">External writes remain disabled until a shared durable approval store is configured. Unsupported connector/action pairs fail closed; no approval state alone authorizes an external write.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Requests can be reviewed or rejected locally. Approval and external writes remain unavailable until a shared durable approval store is configured. Unsupported connector/action pairs fail closed; no approval state alone authorizes an external write.</p>
       </Panel>
       <Panel title="Audit log" className="mt-4" action={
         <div className="flex gap-2">

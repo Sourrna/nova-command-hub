@@ -217,6 +217,8 @@ describe("command workspace — plan + execution", () => {
     const activity = render(<Activity />);
     expect(await screen.findByText(/Approval gate.*1 pending/)).toBeInTheDocument();
     expect(screen.getByText(/Command execution awaiting_approval: Save campaign/)).toBeInTheDocument();
+    expect(screen.getByText("Write unavailable")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(commandMocks.notionExecuteCall).not.toHaveBeenCalled();
     activity.unmount();
   });

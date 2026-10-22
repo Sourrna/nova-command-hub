@@ -19,9 +19,8 @@
 // functions must keep external writes disabled until a shared atomic store is
 // configured and wired into this lifecycle.
 
-export const DURABLE_APPROVAL_STORE_CONFIGURED = false;
-export const APPROVAL_STORE_BLOCKED_MESSAGE =
-  "External writes are disabled: configure and wire a shared durable approval store (D1 transaction or Durable Object) before enabling approvals.";
+import { DURABLE_APPROVAL_STORE_CONFIGURED, APPROVAL_STORE_BLOCKED_MESSAGE } from "./approval-config";
+export { DURABLE_APPROVAL_STORE_CONFIGURED, APPROVAL_STORE_BLOCKED_MESSAGE } from "./approval-config";
 
 export const APPROVAL_TTL_MS = 5 * 60 * 1000; // 5 minutes
 

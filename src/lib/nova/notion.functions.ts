@@ -15,7 +15,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { notionCreatePage } from "./notion.server";
-import { APPROVAL_STORE_BLOCKED_MESSAGE, DURABLE_APPROVAL_STORE_CONFIGURED, consumeApproval, grantApproval, revokeApproval } from "./approval.server";
+import { APPROVAL_STORE_BLOCKED_MESSAGE, DURABLE_APPROVAL_STORE_CONFIGURED } from "./approval-config";
+import { consumeApproval, grantApproval, revokeApproval } from "./approval.server";
 import { notionSearch, type NotionResult } from "./notion.server";
 
 export interface NotionSearchRecord {

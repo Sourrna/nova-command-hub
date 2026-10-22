@@ -2,8 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { githubArgsSchema, githubCaps, splitRepo } from "@/lib/nova/github-capabilities";
 import { buildSnapshot } from "@/lib/nova/github.functions";
 import { grantApproval, revokeApproval, payloadHash } from "@/lib/nova/approval.server";
+import { GITHUB_CONTROL_CAPABILITIES } from "@/routes/github-control";
 
 describe("GitHub capability registry", () => {
+  it("labels create operations unavailable until a write adapter is implemented", () => {
+    const writes = GITHUB_CONTROL_CAPABILITIES.filter((capability) => capability.access === "write");
+    expect(writes.map((capability) => capability.operation)).toEqual(["issues.create", "branches.create", "prs.create"]);
+    expect(writes.every((capability) => !capability.implemented)).toBe(true);
+    expect(GITHUB_CONTROL_CAPABILITIES.filter((capability) => capability.implemented).every((capability) => capability.access === "read")).toBe(true);
+  });
+
   it("validates args for reads", () => {
     expect(githubArgsSchema["repo.get"].safeParse({ owner: "a", repo: "b" }).success).toBe(true);
     expect(githubArgsSchema["issues.get"].safeParse({ owner: "a", repo: "b", number: 1 }).success).toBe(true);
