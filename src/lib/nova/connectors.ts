@@ -34,7 +34,7 @@ export const CONNECTORS: ConnectorDef[] = [
   },
   {
     id: "notion", name: "Notion", category: "workspace",
-    description: "Sync content calendar and notes databases.",
+    description: "Read workspace data; page writes require a configured durable approval store.",
     capabilities: [
       { kind: "read", label: "Read databases", gated: false },
       { kind: "write", label: "Create / update pages", gated: true },
@@ -54,10 +54,7 @@ export const CONNECTORS: ConnectorDef[] = [
   {
     id: "github", name: "GitHub", category: "code",
     description: "Track repositories, issues and releases for projects.",
-    capabilities: [
-      { kind: "read", label: "Read repos & issues", gated: false },
-      { kind: "write", label: "Open issues / PRs", gated: true },
-    ],
+    capabilities: [{ kind: "read", label: "Read repos & issues", gated: false }],
     secrets: ["GITHUB_API_KEY"],
     setup: [
       "Create a fine-grained personal access token with read-only repo scope at github.com/settings/tokens",
@@ -70,7 +67,7 @@ export const CONNECTORS: ConnectorDef[] = [
   },
   {
     id: "linkedin", name: "LinkedIn", category: "social",
-    description: "Publish approved posts and pull basic metrics.",
+    description: "Read organization data; publishing requires a configured durable approval store.",
     capabilities: [
       { kind: "publish", label: "Publish posts", gated: true },
       { kind: "read", label: "Read post metrics", gated: false },

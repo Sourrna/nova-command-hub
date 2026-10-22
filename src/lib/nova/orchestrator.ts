@@ -42,6 +42,46 @@ export interface ExecutionResult {
   completedAt: number;
 }
 
+const SUPPORTED_STEPS: Record<string, TaskKind[]> = {
+  openai: ["generate"],
+  xai: ["generate"],
+  github: ["read"],
+  notion: ["read", "write"],
+  linkedin: ["read", "publish"],
+};
+
+/** Convert schema-validated model output into only operations with real handlers. */
+export function planFromInterpretation(
+  goal: string,
+  interpretation: {
+    objective: string;
+    steps: { title: string; kind: TaskKind; connector: string; gated: boolean }[];
+  },
+): ExecutionPlan | null {
+  const candidates: PlannedStep[] = [];
+  for (const [index, candidate] of interpretation.steps.entries()) {
+    if (!SUPPORTED_STEPS[candidate.connector]?.includes(candidate.kind)) return null;
+    const gated = candidate.kind === "write" || candidate.kind === "publish";
+    if (candidate.gated !== gated) return null;
+    candidates.push({
+      id: `interpreted-${index + 1}`,
+      kind: candidate.kind,
+      title: candidate.title,
+      connector: candidate.connector,
+      gated,
+      dependsOn: [],
+    });
+  }
+  const steps = [...candidates.filter((step) => !step.gated), ...candidates.filter((step) => step.gated)];
+  const generation = steps.find((step) => step.kind === "generate");
+  if (generation) {
+    for (const step of steps) {
+      if (step.gated) step.dependsOn.push(generation.id);
+    }
+  }
+  return { goal: interpretation.objective || goal, steps, createdAt: Date.now() };
+}
+
 /** Build a plan from a natural-language goal. Deterministic: no network, no
  * LLM. The mapping is keyword-driven so it is testable and auditable. */
 export function buildPlan(goal: string): ExecutionPlan {

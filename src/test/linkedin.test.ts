@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { linkedinGet, linkedinOrganizations, linkedinPosts, linkedinMetrics } from "@/lib/nova/linkedin.server";
+import { extractLinkedinAuthors, isLinkedinAuthorUrn, linkedinGet, linkedinOrganizations, linkedinPosts, linkedinMetrics } from "@/lib/nova/linkedin.server";
 
 const withKey = () => {
   const orig = { ...process.env };
@@ -22,6 +22,16 @@ const network = () =>
   }) as unknown as typeof fetch;
 
 describe("LinkedIn connector (linkedin.server)", () => {
+  it("extracts only real author URNs returned by accessible ACL data", () => {
+    const authors = extractLinkedinAuthors({ elements: [
+      { organizationalTarget: "urn:li:organization:123", roleAssignee: "urn:li:person:42" },
+      { organizationalTarget: "urn:li:organization:0" },
+      { organizationalTarget: "not-an-author" },
+    ] });
+    expect(authors).toEqual(["urn:li:organization:123", "urn:li:person:42"]);
+    expect(isLinkedinAuthorUrn("urn:li:organization:0")).toBe(false);
+    expect(isLinkedinAuthorUrn("not-an-author")).toBe(false);
+  });
   it("returns missing when LINKEDIN_ACCESS_TOKEN is not set", async () => {
     const restore = withKey();
     delete process.env["LINKEDIN_ACCESS_TOKEN"];

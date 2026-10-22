@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { ExecutionResult } from "./orchestrator";
 
 export type Stage = "idea" | "strategy" | "draft" | "review" | "approved" | "published" | "measured";
 export const STAGES: Stage[] = ["idea", "strategy", "draft", "review", "approved", "published", "measured"];
@@ -8,13 +9,14 @@ export interface ContentItem { id: string; title: string; channel: string; stage
 export interface Project { id: string; name: string; status: "active" | "paused" | "done"; progress: number; demo?: boolean }
 export interface Memory { id: string; text: string; tag: string; created: number }
 export interface LogEntry { id: string; at: number; kind: "info" | "approval" | "blocked" | "local"; message: string }
-export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected" | "invalidated" | "executed" | "failed"; ref?: string | undefined; payloadHash?: string | undefined; expiresAt?: number | undefined; pageId?: string | undefined }
+export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected" | "invalidated" | "executed" | "failed"; ref?: string | undefined; operation?: "write" | "publish" | undefined; payloadHash?: string | undefined; expiresAt?: number | undefined; pageId?: string | undefined }
+export interface ExecutionRecord { id: string; goal: string; savedAt: number; result: ExecutionResult }
 
 export interface NovaState {
   lang: "en" | "fa";
   disabled: string[]; // connectors manually disconnected by user
   tasks: Task[]; content: ContentItem[]; projects: Project[]; memory: Memory[];
-  log: LogEntry[]; approvals: Approval[];
+  log: LogEntry[]; approvals: Approval[]; executions: ExecutionRecord[];
 }
 
 /** Read the current local state synchronously. Useful for tests and for
@@ -30,7 +32,7 @@ export function exportWorkspace(): string {
   const s = load();
   const approvals = s.approvals.map((a) => {
     const base = { id: a.id, at: a.at, action: a.action, target: a.target, connector: a.connector, state: a.state };
-    return a.ref ? { ...base, ref: a.ref } : base;
+    return { ...base, ...(a.ref ? { ref: a.ref } : {}), ...(a.operation ? { operation: a.operation } : {}) };
   });
   return JSON.stringify({
     version: 1,
@@ -43,6 +45,7 @@ export function exportWorkspace(): string {
     memory: s.memory,
     approvals,
     log: s.log,
+    executions: s.executions,
   }, null, 2);
 }
 
@@ -58,7 +61,7 @@ export function importWorkspace(json: string): { ok: true } | { ok: false; error
   if (!Array.isArray(o["tasks"]) || !Array.isArray(o["content"]) || !Array.isArray(o["projects"]) || !Array.isArray(o["memory"])) {
     return { ok: false, error: "Snapshot is missing required arrays (tasks, content, projects, memory)." };
   }
-const rawApprovals = Array.isArray(o["approvals"]) ? (o["approvals"] as Partial<Approval>[]) : [];
+  const rawApprovals = Array.isArray(o["approvals"]) ? (o["approvals"] as Partial<Approval>[]) : [];
   const approvals: Approval[] = [];
   for (const a of rawApprovals) {
     const state = typeof a.state === "string" ? a.state : undefined;
@@ -73,6 +76,7 @@ const rawApprovals = Array.isArray(o["approvals"]) ? (o["approvals"] as Partial<
         id: a.id, at: a.at, action: a.action, target: a.target,
         connector: a.connector, state,
         ...(a.ref ? { ref: a.ref } : {}),
+        ...(a.operation === "write" || a.operation === "publish" ? { operation: a.operation } : {}),
       });
     }
   }
@@ -85,6 +89,7 @@ const rawApprovals = Array.isArray(o["approvals"]) ? (o["approvals"] as Partial<
     memory: o["memory"] as Memory[],
     log: Array.isArray(o["log"]) ? (o["log"] as LogEntry[]) : [],
     approvals,
+    executions: Array.isArray(o["executions"]) ? o["executions"] as ExecutionRecord[] : [],
   };
   state = next;
   localStorage.setItem(KEY, JSON.stringify(state));
@@ -114,7 +119,7 @@ const seed = (): NovaState => ({
   ],
   memory: [{ id: uid(), text: "Tone: confident, concise, no hype words.", tag: "voice", created: SEED_AT }],
   log: [{ id: uid(), at: SEED_AT, kind: "info", message: "Workspace initialised with demo data." }],
-  approvals: [],
+  approvals: [], executions: [],
 });
 
 let state: NovaState | null = null;
@@ -151,8 +156,11 @@ export const actions = {
   setTask: (id: string, p: Partial<Task>) => update((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...p } : t)) }),
     p.status ? `Task moved to ${p.status}` : undefined),
   delTask: (id: string) => confirm('Delete this task? This cannot be undone.') && update((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }), "Task deleted"),
-  addContent: (title: string, channel: string, notes?: string) =>
-    update((s) => ({ content: [{ id: uid(), title, channel, stage: "idea", notes: notes ?? "", updated: now() }, ...s.content] }), `Content idea added: ${title}`),
+  addContent: (title: string, channel: string, notes?: string, stage: Stage = "idea", linkedinAuthor?: string) => {
+    const id = uid();
+    update((s) => ({ content: [{ id, title, channel, stage, notes: notes ?? "", updated: now(), ...(linkedinAuthor ? { linkedinAuthor } : {}) }, ...s.content] }), `Content idea added: ${title}`);
+    return id;
+  },
   setContent: (id: string, p: Partial<ContentItem>) => {
     const cur = load().content.find((c) => c.id === id);
     const edited = cur && (("title" in p && p.title !== cur.title) || ("notes" in p && p.notes !== cur.notes));
@@ -168,9 +176,11 @@ export const actions = {
   delProject: (id: string) => confirm('Delete this project? This cannot be undone.') && update((s) => ({ projects: s.projects.filter((x) => x.id !== id) }), "Project deleted"),
   addMemory: (text: string, tag: string) => update((s) => ({ memory: [{ id: uid(), text, tag, created: now() }, ...s.memory] }), "Memory saved"),
   delMemory: (id: string) => confirm('Delete this memory? This cannot be undone.') && update((s) => ({ memory: s.memory.filter((m) => m.id !== id) }), "Memory removed"),
-  requestApproval: (action: string, target: string, connector: string, ref?: string) =>
-    update((s) => ({ approvals: [{ id: uid(), at: now(), action, target, connector, state: "pending", ref }, ...s.approvals] }),
+  requestApproval: (action: string, target: string, connector: string, ref?: string, operation?: "write" | "publish") =>
+    update((s) => ({ approvals: [{ id: uid(), at: now(), action, target, connector, state: "pending", ref, ...(operation ? { operation } : {}) }, ...s.approvals] }),
       `Approval requested: ${action} → ${target}`, "approval"),
+  saveExecution: (goal: string, result: ExecutionResult) =>
+    update((s) => ({ executions: [{ id: uid(), goal, result, savedAt: now() }, ...s.executions].slice(0, 30) }), `Command execution ${result.state}: ${goal}`, result.state === "failed" ? "blocked" : "info"),
   resolveApproval: (id: string, approved: boolean, connectorReady: boolean) => {
     const a = load().approvals.find((x) => x.id === id);
     if (!a) return;

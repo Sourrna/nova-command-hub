@@ -101,4 +101,10 @@ describe("approval.server — server-side grant ledger", () => {
     const g = consumeApproval("b3", "c3", "T", "B");
     expect(g.status).toBe("consumed");
   });
+
+  it("rejects reuse of an approval id for altered payload or destination", () => {
+    grantApproval("b4", "c4", "T", "B", "db-1", "Publish to Notion");
+    expect(() => grantApproval("b4", "c4", "Changed", "B", "db-1", "Publish to Notion")).toThrow(/different payload or destination/);
+    expect(() => grantApproval("b4", "c4", "T", "B", "db-2", "Publish to Notion")).toThrow(/different payload or destination/);
+  });
 });

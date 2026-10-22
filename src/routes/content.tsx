@@ -19,6 +19,7 @@ function Studio() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [drafting, setDrafting] = useState(false);
+  const [operationError, setOperationError] = useState("");
   const shown = items.filter((c) => c.title.toLowerCase().includes(q.toLowerCase()) && (filter === "all" || c.channel === filter));
 
   const move = (c: ContentItem, dir: 1 | -1) => {
@@ -27,7 +28,14 @@ function Studio() {
     // Approved → published is an external write: route through the approval gate.
     if (next === "published") {
       if (approvals.some((a) => a.ref === c.id && a.state === "pending")) return;
-      actions.requestApproval(`Publish "${c.title}"`, c.channel, c.channel.toLowerCase(), c.id);
+      const connector = c.channel.toLowerCase();
+      const operation = connector === "linkedin" ? "publish" : connector === "notion" ? "write" : undefined;
+      if (!operation) {
+        setOperationError(`Publishing/writing to ${c.channel} is not implemented. No operation was submitted.`);
+        return;
+      }
+      setOperationError("");
+      actions.requestApproval(`${operation === "publish" ? "Publish" : "Save"} "${c.title}"`, c.channel, connector, c.id, operation);
       return;
     }
     actions.setContent(c.id, { stage: next });
@@ -51,6 +59,7 @@ function Studio() {
           <select className="field w-32" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter channel"><option value="all">All channels</option><option>LinkedIn</option><option>Notion</option><option>GitHub</option></select>
         </form>
         <p className="mt-2 text-xs text-muted-foreground">Moving an item from Approved to Published creates an approval request. Editing an approved item invalidates its approval and returns it to Review. No post is sent until a real adapter is connected.</p>
+        {operationError && <p role="alert" className="mt-2 text-sm text-destructive">{operationError}</p>}
       </Panel>
       <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
         {STAGES.map((st) => {

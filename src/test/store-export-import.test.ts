@@ -6,6 +6,7 @@ import {
   actions,
   readState,
 } from "@/lib/nova/store";
+import { buildPlan } from "@/lib/nova/orchestrator";
 
 // Reset the module-level store between tests so each one starts clean.
 beforeEach(() => {
@@ -20,6 +21,12 @@ describe("exportWorkspace", () => {
   it("returns a JSON string with version and all collections", () => {
     actions.addTask("Do something", "high");
     actions.addContent("Post idea", "LinkedIn");
+    actions.saveExecution("Write a post", {
+      plan: buildPlan("Draft a post"),
+      steps: [{ stepId: "s1-generate", state: "done", summary: "Generated", artifact: { text: "Draft" } }],
+      state: "complete",
+      completedAt: Date.now(),
+    });
     const raw = exportWorkspace();
     expect(() => JSON.parse(raw)).not.toThrow();
     const snap = JSON.parse(raw);
@@ -29,6 +36,7 @@ describe("exportWorkspace", () => {
     expect(Array.isArray(snap.content)).toBe(true);
     expect(Array.isArray(snap.projects)).toBe(true);
     expect(Array.isArray(snap.memory)).toBe(true);
+    expect(snap.executions).toHaveLength(1);
     expect(snap.tasks.some((t: { title: string }) => t.title === "Do something")).toBe(true);
     expect(snap.content.some((c: { title: string }) => c.title === "Post idea")).toBe(true);
   });
@@ -55,6 +63,12 @@ describe("importWorkspace", () => {
   it("restores a snapshot produced by exportWorkspace", () => {
     actions.addTask("Original", "med");
     actions.addContent("Original post", "Notion");
+    actions.saveExecution("Draft", {
+      plan: buildPlan("Draft"),
+      steps: [{ stepId: "s0-analyze", state: "failed", summary: "Failed", error: "Missing credential" }],
+      state: "failed",
+      completedAt: Date.now(),
+    });
     const raw = exportWorkspace();
 
     actions.reset();
@@ -63,6 +77,7 @@ describe("importWorkspace", () => {
     const s = readState();
     expect(s.tasks.some((t) => t.title === "Original")).toBe(true);
     expect(s.content.some((c) => c.title === "Original post")).toBe(true);
+    expect(s.executions[0]?.goal).toBe("Draft");
   });
 
   it("rejects malformed JSON", () => {

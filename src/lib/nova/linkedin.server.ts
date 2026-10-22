@@ -90,10 +90,27 @@ export interface LinkedinPostInput {
 }
 
 const COMMENTARY_MAX = 700;
-const AUTHOR_RE = /^urn:li:(person|organization):\d+$/i;
+const AUTHOR_RE = /^urn:li:(person|organization):[1-9]\d*$/i;
+
+export function isLinkedinAuthorUrn(value: string): boolean {
+  return AUTHOR_RE.test(value.trim());
+}
+
+export function extractLinkedinAuthors(data: unknown): string[] {
+  if (!data || typeof data !== "object" || !("elements" in data) || !Array.isArray(data.elements)) return [];
+  const authors = new Set<string>();
+  for (const element of data.elements) {
+    if (!element || typeof element !== "object") continue;
+    for (const key of ["organizationalTarget", "roleAssignee"]) {
+      const value = (element as Record<string, unknown>)[key];
+      if (typeof value === "string" && isLinkedinAuthorUrn(value)) authors.add(value);
+    }
+  }
+  return [...authors];
+}
 
 export function validateLinkedinPost(input: LinkedinPostInput): { ok: true } | { ok: false; error: string } {
-  if (typeof input.author !== "string" || !AUTHOR_RE.test(input.author.trim())) {
+  if (typeof input.author !== "string" || !isLinkedinAuthorUrn(input.author)) {
     return { ok: false, error: "Author must be a valid LinkedIn URN (urn:li:person:… or urn:li:organization:…)." };
   }
   if (input.visibility !== "PUBLIC" && input.visibility !== "CONNECTIONS") {

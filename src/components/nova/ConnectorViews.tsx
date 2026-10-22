@@ -73,13 +73,13 @@ export function ConnectorDetail({ id, demo }: { id: ConnectorId; demo?: React.Re
           {c.capabilities.map((cap) => (
             <li key={cap.label} className="flex items-center justify-between rounded-md border p-3 text-sm">
               <span>{cap.label}</span>
-              <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><span className="chip text-idle text-xs">{hasLiveAdapter ? (h.status === "connected" ? "Live" : "Unavailable until verified") : "Adapter not implemented"}</span></span>
+              <span className="flex items-center gap-2"><span className="label-hud">{cap.gated ? "approval required" : cap.kind}</span><span className="chip text-idle text-xs">{cap.gated ? "Disabled: durable approval store required" : hasLiveAdapter ? (h.status === "connected" ? "Live" : "Unavailable until verified") : "Adapter not implemented"}</span></span>
             </li>
           ))}
         </ul>
         <p className="mt-3 text-xs text-muted-foreground">
           {hasLiveAdapter
-            ? "Status is verified with a live API call; gated actions are logged and blocked rather than simulated."
+            ? "Status is verified with a live API call. Gated writes remain disabled until durable approval storage is configured."
             : "Live adapter not implemented in this MVP; gated actions are logged and blocked rather than simulated."}
         </p>
       </Panel>

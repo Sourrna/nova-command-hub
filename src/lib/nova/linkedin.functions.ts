@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { linkedinOrganizations, linkedinMetrics, linkedinPosts, linkedinPublishPost, type LinkedinPostInput } from "./linkedin.server";
-import { consumeApproval, grantApproval } from "./approval.server";
+import { linkedinOrganizations, linkedinMetrics, linkedinPosts, linkedinPublishPost, extractLinkedinAuthors, isLinkedinAuthorUrn, type LinkedinPostInput } from "./linkedin.server";
+import { APPROVAL_STORE_BLOCKED_MESSAGE, DURABLE_APPROVAL_STORE_CONFIGURED, consumeApproval, grantApproval, revokeApproval } from "./approval.server";
 
 export interface LinkedinSnapshot {
   ok: boolean;
@@ -11,6 +11,7 @@ export interface LinkedinSnapshot {
   posts: number;
   engagement: number;
   firstOrgId?: string | undefined;
+  authors: string[];
 }
 
 type Org = { id?: string };
@@ -26,7 +27,7 @@ export function buildLinkedinSnapshot(
   posts: Awaited<ReturnType<typeof linkedinPosts>>,
   metrics: Awaited<ReturnType<typeof linkedinMetrics>>,
 ): LinkedinSnapshot {
-  if (!orgs.ok) return { ok: false, error: orgs.error, code: orgs.code, organizations: 0, posts: 0, engagement: 0 };
+  if (!orgs.ok) return { ok: false, error: orgs.error, code: orgs.code, organizations: 0, posts: 0, engagement: 0, authors: [] };
   const orgElements = elements(orgs) as Org[];
   return {
     ok: true,
@@ -34,6 +35,7 @@ export function buildLinkedinSnapshot(
     posts: elements(posts).length,
     engagement: elements(metrics).length,
     firstOrgId: orgElements[0]?.id,
+    authors: extractLinkedinAuthors(orgs.data),
   };
 }
 
@@ -71,6 +73,13 @@ export const grantLinkedinApproval = createServerFn({ method: "POST" })
     return r.data;
   })
   .handler(async ({ data }) => {
+    if (!DURABLE_APPROVAL_STORE_CONFIGURED) return { ok: false as const, code: "approval_storage_unavailable" as const, error: APPROVAL_STORE_BLOCKED_MESSAGE };
+    if (!isLinkedinAuthorUrn(data.author)) return { ok: false as const, code: "invalid_author" as const, error: "Select a valid LinkedIn author URN." };
+    const organizations = await linkedinOrganizations();
+    if (!organizations.ok) return { ok: false as const, code: organizations.code, error: organizations.error };
+    if (!extractLinkedinAuthors(organizations.data).includes(data.author.trim())) {
+      return { ok: false as const, code: "invalid_author" as const, error: "The selected LinkedIn author is not available to this integration." };
+    }
     grantApproval(
       data.approvalId,
       data.contentId,
@@ -101,11 +110,24 @@ export const executeLinkedinPublish = createServerFn({ method: "POST" })
     return r.data;
   })
   .handler(async ({ data }) =>
-    executeLinkedinPublishCore(
-      data as { author: string; visibility: "PUBLIC" | "CONNECTIONS"; commentary: string; title?: string; approvalId: string; contentId: string },
-      (i, f) => linkedinPublishPost(i, f),
-    ),
+    DURABLE_APPROVAL_STORE_CONFIGURED
+      ? executeLinkedinPublishCore(
+          data as { author: string; visibility: "PUBLIC" | "CONNECTIONS"; commentary: string; title?: string; approvalId: string; contentId: string },
+          (i, f) => linkedinPublishPost(i, f),
+        )
+      : { ok: false as const, code: "approval_storage_unavailable", error: APPROVAL_STORE_BLOCKED_MESSAGE },
   );
+
+export const revokeLinkedinApproval = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => {
+    const r = z.object({ approvalId: z.string().trim().min(1) }).safeParse(d);
+    if (!r.success) throw new Error(r.error.issues[0]?.message ?? "Invalid input");
+    return r.data;
+  })
+  .handler(async ({ data }) => {
+    revokeApproval(data.approvalId);
+    return { ok: true as const };
+  });
 
 /** Pure core — no Start runtime dependency, safe to unit-test directly.
  * `publish` is injected so tests can supply a stub adapter. */

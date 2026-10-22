@@ -14,11 +14,14 @@
 // new approval. Execution is single-use: a second call finds consumed and is
 // rejected, so replayed approvals cannot create duplicate Notion pages.
 //
-// Durability note: this ledger is in-process memory. It is durable for the
-// lifetime of the worker isolate that handled the grant, and it is the
-// authority that prevents re-execution within that scope. Across isolated
-// requests the Notion Idempotency-Key header (sent by the adapter) provides
-// API-level dedupe. We do NOT claim cross-isolate replay protection.
+// The current deployment has no shared KV, D1, or Durable Object binding.
+// The in-memory ledger below is test/local-process support only; server
+// functions must keep external writes disabled until a shared atomic store is
+// configured and wired into this lifecycle.
+
+export const DURABLE_APPROVAL_STORE_CONFIGURED = false;
+export const APPROVAL_STORE_BLOCKED_MESSAGE =
+  "External writes are disabled: configure and wire a shared durable approval store (D1 transaction or Durable Object) before enabling approvals.";
 
 export const APPROVAL_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -27,6 +30,7 @@ export type GrantStatus = "granted" | "consumed" | "revoked" | "expired";
 export interface ApprovalGrant {
   approvalId: string;
   contentId: string;
+  payload: string;
   payloadHash: string;
   idempotencyKey: string;
   grantedAt: number;
@@ -92,6 +96,12 @@ export function grantApproval(
     if (existing.status === "consumed") throw new Error("This approval was already used to publish.");
     if (existing.status === "revoked") throw new Error("This approval was revoked; request a new one.");
     if (existing.status === "expired") throw new Error("This approval expired; request a new one.");
+    if (
+      existing.contentId !== contentId ||
+      existing.payload !== JSON.stringify([title, body]) ||
+      existing.destination !== destination ||
+      existing.action !== action
+    ) throw new Error("This approval id is already bound to a different payload or destination.");
     return existing;
   }
   const now = Date.now();
@@ -99,6 +109,7 @@ export function grantApproval(
   const grant: LedgerEntry = {
     approvalId,
     contentId,
+    payload: JSON.stringify([title, body]),
     payloadHash: hash,
     idempotencyKey: `${approvalId}:${hash}`,
     grantedAt: now,
@@ -126,18 +137,18 @@ export function consumeApproval(
   if (!grant) throw new Error("No valid approval for this content item; request approval first.");
   if (grant.contentId !== contentId) throw new Error("Approval does not belong to this content item.");
   if (grant.status !== "granted") throw new Error(grant.status === "consumed" ? "This approval was already used." : "This approval is no longer valid.");
-  if (Date.now() > grant.expiresAt) {
+  if (Date.now() >= grant.expiresAt) {
     grant.status = "expired";
     throw new Error("This approval expired; request a new one.");
   }
   const incoming = payloadHash(title, body);
-  if (incoming !== grant.payloadHash) {
+  if (incoming !== grant.payloadHash || grant.payload !== JSON.stringify([title, body])) {
     throw new Error("Content changed after approval; request a new approval for the current content.");
   }
-  if (destination !== undefined && grant.destination !== undefined && grant.destination !== destination) {
+  if (grant.destination !== destination) {
     throw new Error("Publication destination changed after approval; request a new approval.");
   }
-  if (action !== undefined && grant.action !== undefined && grant.action !== action) {
+  if (grant.action !== action) {
     throw new Error("Publication action changed after approval; request a new approval.");
   }
   grant.consumedAt = Date.now();

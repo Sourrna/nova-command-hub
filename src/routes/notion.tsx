@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ExternalLink, FileText, RefreshCw, Database } from "lucide-react";
 import { PageHeader, Panel, Empty, StatusChip } from "@/components/nova/ui";
 import { ConnectorDetail } from "@/components/nova/ConnectorViews";
-import { notionSearch } from "@/lib/nova/notion.server";
+import { searchNotion } from "@/lib/nova/notion.functions";
 import { healthQuery } from "@/lib/nova/health";
 import { meta } from "@/lib/nova/meta";
 
@@ -19,9 +20,10 @@ export const Route = createFileRoute("/notion")({
 });
 
 function NotionPage() {
+  const search = useServerFn(searchNotion);
   const q = useQuery({
     queryKey: ["notion-search"],
-    queryFn: () => notionSearch("Nova"),
+    queryFn: () => search({ data: { query: "Nova" } }),
     staleTime: 60_000,
     retry: false,
   });
@@ -57,11 +59,11 @@ function NotionPage() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {data.data.results.length} record(s) returned for query "Nova". Read-only — writes require explicit approval and are not implemented.
+                {data.data.results.length} record(s) returned for query "Nova". Writes remain disabled until a shared durable approval store is configured.
               </p>
               {data.data.results.length > 0 ? (
                 <ul className="space-y-1 text-sm">
-                  {(data.data.results as { id: string; object: string; url?: string; title?: string }[]).map((r) => (
+                  {data.data.results.map((r) => (
                     <li key={r.id} className="flex items-center gap-2">
                       {r.object === "database" ? <Database size={14} /> : <FileText size={14} />}
                       <span className="truncate">{r.title ?? r.id}</span>

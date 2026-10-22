@@ -48,7 +48,20 @@ describe("executeLinkedinPublishCore — approval gate", () => {
       expect(r.idempotencyKey).toBe(`l1:${payloadHash("", COMMENTARY)}`);
     }
     expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ author: AUTHOR }), expect.anything());
     expect(calls[0]?.idempotencyKey).toBe(`l1:${payloadHash("", COMMENTARY)}`);
+  });
+
+  it("publishes only to the selected LinkedIn author bound in the approval", async () => {
+    const selected = "urn:li:organization:987";
+    grantApproval("l-selected", "content-selected", "", COMMENTARY, selected, `Publish to LinkedIn as ${selected}`);
+    const publish = vi.fn(async (input: LinkedinPostInput) => ({ ok: true as const, data: { id: input.author } }));
+    const result = await executeLinkedinPublishCore(
+      { ...call("l-selected", "content-selected", { author: selected }), author: selected },
+      publish,
+    );
+    expect(result.ok).toBe(true);
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ author: selected }), expect.anything());
   });
 
   it("rejects a payload that changed after approval", async () => {

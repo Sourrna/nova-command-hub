@@ -1,8 +1,160 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import React from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { buildPlan, executePlan } from "@/lib/nova/orchestrator";
+import { planFromInterpretation } from "@/lib/nova/orchestrator";
 import { parseInterpretation, GoalInterpretationSchema } from "@/lib/nova/command-interpreter";
+import { actions, readState } from "@/lib/nova/store";
+
+const commandMocks = vi.hoisted(() => ({
+  interpret: Symbol("interpret"),
+  generate: Symbol("generate"),
+  notion: Symbol("notion"),
+  linkedin: Symbol("linkedin"),
+  interpretCall: vi.fn(),
+  generateCall: vi.fn(),
+  linkedinCall: vi.fn(),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  createFileRoute: () => (route: unknown) => route,
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+}));
+vi.mock("@tanstack/react-start", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-start")>();
+  return {
+    ...actual,
+    useServerFn: (fn: unknown) => fn === commandMocks.interpret
+      ? commandMocks.interpretCall
+      : fn === commandMocks.generate
+        ? commandMocks.generateCall
+        : fn === commandMocks.linkedin
+          ? commandMocks.linkedinCall
+        : async () => ({ ok: false, error: "not used" }),
+  };
+});
+vi.mock("@/lib/nova/command.server", () => ({ interpretGoal: commandMocks.interpret }));
+vi.mock("@/lib/nova/ai.functions", () => ({ generateAi: commandMocks.generate }));
+vi.mock("@/lib/nova/notion.functions", () => ({ searchNotion: commandMocks.notion }));
+vi.mock("@/lib/nova/linkedin.functions", () => ({ getLinkedinSnapshot: commandMocks.linkedin }));
+vi.mock("@/lib/nova/health", () => ({
+  useHealth: () => ({
+    get: (id: string) => ({ status: id === "xai" ? "connected" : "needs_setup", reason: "test", missing: [] }),
+  }),
+}));
+
+import { CommandPage } from "@/routes/command";
+
+beforeEach(() => {
+  actions.reset();
+  commandMocks.interpretCall.mockReset().mockResolvedValue({
+    ok: true,
+    value: {
+      objective: "Draft a launch announcement",
+      intent: "draft",
+      connectors: ["xai"],
+      steps: [{ title: "Generate announcement", kind: "generate", connector: "xai", gated: false }],
+      needsApproval: false,
+      confidence: 0.92,
+    },
+  });
+  commandMocks.generateCall.mockReset().mockResolvedValue({
+    ok: true,
+    value: { text: "Launch headline\nFull generated announcement.", model: "grok-test" },
+  });
+  commandMocks.linkedinCall.mockReset().mockResolvedValue({ ok: true, authors: ["urn:li:organization:321"] });
+});
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}><CommandPage /></QueryClientProvider>);
+}
 
 describe("command workspace — plan + execution", () => {
+  it("uses a validated interpreted plan and rejects unsupported operations", () => {
+    const candidate = {
+      objective: "Research project",
+      steps: [{ title: "Read context", kind: "read" as const, connector: "github", gated: false }],
+    };
+    expect(planFromInterpretation("original", candidate)?.steps[0]?.connector).toBe("github");
+    expect(planFromInterpretation("original", {
+      ...candidate,
+      steps: [{ title: "Make issue", kind: "write", connector: "github", gated: true }],
+    })).toBeNull();
+  });
+
+  it("renders, persists, restores, and continues a generated draft", async () => {
+    const first = renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Something unrelated" } });
+    fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
+    await screen.findByText(/Using validated AI plan/);
+    expect(screen.getAllByText("Generate announcement")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    expect(await screen.findByText(/Full generated announcement\./)).toBeInTheDocument();
+    await waitFor(() => expect(readState().executions).toHaveLength(1));
+    const save = screen.getByRole("button", { name: "Save to Content Studio" });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+    expect(readState().content.some((item) => item.notes === "Launch headline\nFull generated announcement." && item.linkedinAuthor === "urn:li:organization:321")).toBe(true);
+    expect(commandMocks.generateCall).toHaveBeenCalledWith({ data: { provider: "xai", prompt: "Draft a launch announcement" } });
+
+    first.unmount();
+    renderPage();
+    expect(await screen.findByText(/Full generated announcement\./)).toBeInTheDocument();
+    expect(screen.getByText(/Restored the most recent command execution/)).toBeInTheDocument();
+  });
+
+  it("keeps a gated Notion step pending and creates only a local approval request", async () => {
+    commandMocks.interpretCall.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        objective: "Save the campaign to Notion",
+        intent: "save",
+        connectors: ["notion"],
+        steps: [{ title: "Create Notion page", kind: "write", connector: "notion", gated: true }],
+        needsApproval: true,
+        confidence: 0.9,
+      },
+    });
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Save campaign" } });
+    fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
+    await screen.findByText(/Using validated AI plan/);
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    expect(await screen.findByText("Awaiting approval.")).toBeInTheDocument();
+    expect(readState().executions[0]?.result.state).toBe("awaiting_approval");
+    expect(readState().executions[0]?.result.steps[0]?.state).toBe("pending");
+    expect(readState().approvals[0]?.state).toBe("pending");
+    expect(readState().approvals[0]?.operation).toBe("write");
+  });
+
+  it("keeps a gated LinkedIn publish step pending and creates a local approval request", async () => {
+    commandMocks.interpretCall.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        objective: "Publish launch announcement to LinkedIn",
+        intent: "publish",
+        connectors: ["linkedin"],
+        steps: [{ title: "Publish to LinkedIn", kind: "publish", connector: "linkedin", gated: true }],
+        needsApproval: true,
+        confidence: 0.9,
+      },
+    });
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Publish announcement" } });
+    fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
+    await screen.findByText(/Using validated AI plan/);
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    expect(await screen.findByText("Awaiting approval.")).toBeInTheDocument();
+    expect(readState().executions[0]?.result.state).toBe("awaiting_approval");
+    expect(readState().executions[0]?.result.steps[0]?.state).toBe("pending");
+    expect(readState().approvals[0]?.state).toBe("pending");
+    expect(readState().approvals[0]?.connector).toBe("linkedin");
+    expect(readState().approvals[0]?.operation).toBe("publish");
+    expect(readState().content[0]?.channel).toBe("LinkedIn");
+  });
+
   it("builds a real plan from a publish goal with gated step", () => {
     const p = buildPlan("Publish this week's LinkedIn post about shipping");
     expect(p.steps.some((s) => s.kind === "generate")).toBe(true);

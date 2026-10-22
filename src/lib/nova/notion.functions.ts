@@ -15,7 +15,68 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { notionCreatePage } from "./notion.server";
-import { consumeApproval, grantApproval, revokeApproval } from "./approval.server";
+import { APPROVAL_STORE_BLOCKED_MESSAGE, DURABLE_APPROVAL_STORE_CONFIGURED, consumeApproval, grantApproval, revokeApproval } from "./approval.server";
+import { notionSearch, type NotionResult } from "./notion.server";
+
+export interface NotionSearchRecord {
+  id: string;
+  object: string;
+  url?: string;
+  title?: string;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function richText(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const text = value
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record) return "";
+      if (typeof record["plain_text"] === "string") return record["plain_text"];
+      const textRecord = asRecord(record["text"]);
+      return typeof textRecord?.["content"] === "string" ? textRecord["content"] : "";
+    })
+    .join("");
+  return text || undefined;
+}
+
+export function normalizeNotionSearchRecord(value: unknown): NotionSearchRecord | null {
+  const record = asRecord(value);
+  if (!record || typeof record["id"] !== "string" || typeof record["object"] !== "string") return null;
+
+  const directTitle = richText(record["title"]);
+  const properties = asRecord(record["properties"]);
+  const propertyTitle = properties
+    ? Object.values(properties)
+      .map(asRecord)
+      .map((property) => property && (richText(property["title"]) ?? richText(property["rich_text"])))
+      .find((title): title is string => Boolean(title))
+    : undefined;
+  const title = directTitle ?? propertyTitle;
+
+  return {
+    id: record["id"],
+    object: record["object"],
+    ...(typeof record["url"] === "string" ? { url: record["url"] } : {}),
+    ...(title ? { title } : {}),
+  };
+}
+
+export const searchNotion = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => z.object({ query: z.string().trim().max(200).default("Nova") }).parse(d))
+  .handler(async ({ data }): Promise<NotionResult<{ results: NotionSearchRecord[] }>> => {
+    const result = await notionSearch(data.query);
+    if (!result.ok) return result;
+    return {
+      ok: true,
+      data: { results: result.data.results.map(normalizeNotionSearchRecord).filter((record): record is NotionSearchRecord => record !== null) },
+    };
+  });
 
 export const NotionPageInputSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200, "Title too long"),
@@ -49,6 +110,7 @@ export const grantNotionApproval = createServerFn({ method: "POST" })
     return r.data;
   })
   .handler(async ({ data }) => {
+    if (!DURABLE_APPROVAL_STORE_CONFIGURED) return { ok: false as const, code: "approval_storage_unavailable" as const, error: APPROVAL_STORE_BLOCKED_MESSAGE };
     grantApproval(
       data.approvalId,
       data.contentId,
@@ -67,6 +129,7 @@ export const executeNotionWrite = createServerFn({ method: "POST" })
     return r.data;
   })
   .handler(async ({ data }) => {
+    if (!DURABLE_APPROVAL_STORE_CONFIGURED) return { ok: false as const, code: "approval_storage_unavailable" as const, error: APPROVAL_STORE_BLOCKED_MESSAGE };
     // The grant was created by the human's click (grantNotionApproval). We do
     // NOT create one here — a client flag is not authorization. Consume the
     // existing grant atomically: payload hash, ownership, destination, action,
