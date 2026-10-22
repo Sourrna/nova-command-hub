@@ -64,7 +64,7 @@ function SettingsPage() {
         </Panel>
         <Panel title="Secrets" className="md:col-span-2">
           <p className="text-sm text-muted-foreground">API keys are never entered or stored here. Add them as server-side secrets (OPENAI_API_KEY, XAI_API_KEY, NOTION_API_KEY, GITHUB_API_KEY, LINKEDIN_ACCESS_TOKEN), then re-check status on each connector page.</p>
-          <p className="mt-2 text-sm text-muted-foreground">Notion and LinkedIn external writes are fail-closed until a shared durable approval store (D1 with atomic updates or a Durable Object) is configured and wired to grant, consume and revoke operations.</p>
+          <p className="mt-2 text-sm text-muted-foreground">GitHub, Notion, and LinkedIn writes are fail-closed. Enabling them requires a provisioned shared atomic store, authenticated user identity/ownership checks, and server-side grant, consume, revoke, expiry, and idempotency enforcement.</p>
         </Panel>
       </div>
     </>

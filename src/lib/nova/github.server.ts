@@ -11,11 +11,16 @@ const GATEWAY = "https://connector-gateway.lovable.dev/github";
 const DIRECT = "https://api.github.com";
 export const GH_REPO = "Sourrna/nova-brand-ai";
 
-export type GhResult<T> = { ok: true; data: T } | { ok: false; code: "missing" | "auth" | "rate" | "error"; error: string };
+export type GhResult<T> = { ok: true; data: T } | { ok: false; code: "missing" | "auth" | "permission" | "rate" | "error"; error: string };
 
-function classify(status: number): GhResult<never> {
+function classify(status: number, rateRemaining?: string | null): GhResult<never> {
   if (status === 401) return { ok: false, code: "auth", error: "GitHub rejected the credentials." };
-  if (status === 403 || status === 429) return { ok: false, code: "rate", error: `GitHub refused (${status}); rate limit or permission.` };
+  if (status === 403) {
+    return rateRemaining === "0"
+      ? { ok: false, code: "rate", error: "GitHub rate limited the request; try again later." }
+      : { ok: false, code: "permission", error: "GitHub refused the request; check repository access and token permissions." };
+  }
+  if (status === 429) return { ok: false, code: "rate", error: "GitHub rate limited the request; try again later." };
   return { ok: false, code: "error", error: `GitHub request failed (${status}).` };
 }
 
@@ -23,9 +28,8 @@ async function request<T>(url: string, headers: Record<string, string>, f: typeo
   try {
     const r = await f(url, { headers, signal: AbortSignal.timeout(10_000) });
     if (!r.ok) {
-      const body = (await r.text()).slice(0, 300);
-      console.error(`GitHub [${r.status}]: ${body}`);
-      return classify(r.status);
+      await r.body?.cancel();
+      return classify(r.status, r.headers.get("X-RateLimit-Remaining"));
     }
     return { ok: true, data: (await r.json()) as T };
   } catch {

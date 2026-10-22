@@ -4,7 +4,7 @@ import { ghGet, GH_REPO } from "./github.server";
 export interface RepoSnapshot {
   ok: boolean;
   error?: string;
-  code?: "missing" | "auth" | "rate" | "error";
+  code?: "missing" | "auth" | "permission" | "rate" | "error";
   repo: string;
   info?: {
     description: string | null;

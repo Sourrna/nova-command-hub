@@ -53,12 +53,17 @@ export const CONNECTORS: ConnectorDef[] = [
   },
   {
     id: "github", name: "GitHub", category: "code",
-    description: "Track repositories, issues and releases for projects.",
-    capabilities: [{ kind: "read", label: "Read repos & issues", gated: false }],
+    description: "Read repositories and manage issues, branches and pull requests when authenticated durable approvals are available.",
+    capabilities: [
+      { kind: "read", label: "Read repos, issues & pull requests", gated: false },
+      { kind: "write", label: "Create / update issues, branches & pull requests", gated: true },
+    ],
     secrets: ["GITHUB_API_KEY"],
     setup: [
       "Create a fine-grained personal access token with read-only repo scope at github.com/settings/tokens",
       "Add it as server secret GITHUB_API_KEY",
+      "When mutations are safely enabled, grant Issues read/write for issue changes, Contents read/write for branch creation, and Pull requests read/write for PR creation",
+      "Mutations remain blocked until authenticated durable approvals and idempotency are configured",
       "On Lovable: also set LOVABLE_API_KEY so the connector uses the Lovable gateway",
       "On local dev: GITHUB_API_KEY alone is enough — the adapter falls back to the direct GitHub REST API",
       "Re-check status here",

@@ -224,6 +224,34 @@ describe("command workspace — plan + execution", () => {
     expect(JSON.stringify(readState().executions[0]?.result.steps[0]?.artifact)).toContain('"operation":"issues.list"');
   });
 
+  it("keeps a GitHub issue creation request pending and never calls the read adapter", async () => {
+    commandMocks.interpretCall.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        objective: "Create an issue in GitHub",
+        intent: "save",
+        connectors: ["github"],
+        steps: [{ title: "Create an issue", kind: "write", connector: "github", gated: true }],
+        needsApproval: true,
+        confidence: 0.9,
+      },
+    });
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Create issue in GitHub" } });
+    fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
+    await screen.findByText(/AI plan requested an unsupported or unsafe operation/);
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+
+    expect(await screen.findByText("Awaiting approval.")).toBeInTheDocument();
+    expect(readState().executions[0]?.result.state).toBe("awaiting_approval");
+    expect(readState().approvals[0]).toMatchObject({ connector: "github", state: "pending", operation: "write" });
+    expect(commandMocks.githubCall).not.toHaveBeenCalled();
+
+    render(<Activity />);
+    expect(await screen.findByText("Write unavailable")).toBeInTheDocument();
+    expect(commandMocks.githubCall).not.toHaveBeenCalled();
+  });
+
   it("keeps a gated Notion step pending and creates only a local approval request", async () => {
     commandMocks.interpretCall.mockResolvedValueOnce({
       ok: true,

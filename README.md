@@ -46,8 +46,16 @@ following as server environment secrets, then re-check connector health:
   requests that item. Goals default to `Sourrna/nova-brand-ai` unless an
   `owner/repo` value or GitHub repository URL is provided. Provider results and
   failures are recorded in the local execution history.
-- GitHub issue/branch/PR creation is not implemented and is not offered as an
-  available capability.
+- GitHub issue creation/update, branch creation, and pull-request creation have
+  server-side request validation, operation mapping, and authenticated write
+  adapter. The
+  mutation endpoint remains fail-closed: it will not call GitHub until
+  authenticated ownership and a shared atomic approval lifecycle are
+  implemented and configured. Command Center records these requests as pending
+  instead of misrouting them to a read operation.
+  When enabled later, the token needs Issues read/write for issue changes,
+  Contents read/write for branch creation, and Pull requests read/write for PR
+  creation.
 - Notion search and LinkedIn organization reads use server-side credentials.
   Connector health is reported as connected only after the adapter's live read
   succeeds.

@@ -9,6 +9,7 @@ export type GitHubOp =
   | "prs.get"
   | "commits.list"
   | "issues.create"
+  | "issues.update"
   | "branches.create"
   | "prs.create";
 
@@ -16,10 +17,11 @@ export type AuthzClass = "read" | "write" | "destructive";
 
 export interface GitHubCapability {
   op: GitHubOp;
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PATCH";
   path: (args: any) => string;
   authz: AuthzClass;
   implemented: boolean;
+  writeBlocked: boolean;
   requires: { token?: boolean; scopes?: string[] };
   approvalRequired: boolean;
   description: string;
@@ -35,6 +37,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo }) => `repos/${owner}/${repo}`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "Repository metadata",
@@ -46,6 +49,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo }) => `repos/${owner}/${repo}/branches?per_page=30`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "List branches",
@@ -57,6 +61,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo }) => `repos/${owner}/${repo}/issues?state=${encodeURIComponent("open")}&per_page=30`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "List open issues",
@@ -68,6 +73,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo, number }) => `repos/${owner}/${repo}/issues/${number}`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "Get issue details",
@@ -79,6 +85,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo }) => `repos/${owner}/${repo}/pulls?state=${encodeURIComponent("open")}&per_page=30`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "List open pull requests",
@@ -90,6 +97,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo, number }) => `repos/${owner}/${repo}/pulls/${number}`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "Get pull request details",
@@ -101,6 +109,7 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     path: ({ owner, repo }) => `repos/${owner}/${repo}/commits?per_page=30`,
     authz: "read",
     implemented: true,
+    writeBlocked: false,
     requires: { token: false },
     approvalRequired: false,
     description: "List recent commits",
@@ -111,18 +120,32 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "POST",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/issues`,
     authz: "write",
-    implemented: false,
+    implemented: true,
+    writeBlocked: true,
     requires: { token: true, scopes: ["repo"] },
     approvalRequired: true,
     description: "Create an issue",
     notes: "Requires write access. Bound to approval payload.",
+  },
+  "issues.update": {
+    op: "issues.update",
+    method: "PATCH",
+    path: ({ owner, repo, number }) => `repos/${owner}/${repo}/issues/${number}`,
+    authz: "write",
+    implemented: true,
+    writeBlocked: true,
+    requires: { token: true, scopes: ["repo"] },
+    approvalRequired: true,
+    description: "Update an issue",
+    notes: "Requires write access and an owner-bound approval.",
   },
   "branches.create": {
     op: "branches.create",
     method: "POST",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/git/refs`,
     authz: "write",
-    implemented: false,
+    implemented: true,
+    writeBlocked: true,
     requires: { token: true, scopes: ["repo"] },
     approvalRequired: true,
     description: "Create a branch (ref)",
@@ -133,7 +156,8 @@ export const githubCaps: Record<GitHubOp, GitHubCapability> = {
     method: "POST",
     path: ({ owner, repo }) => `repos/${owner}/${repo}/pulls`,
     authz: "write",
-    implemented: false,
+    implemented: true,
+    writeBlocked: true,
     requires: { token: true, scopes: ["repo"] },
     approvalRequired: true,
     description: "Create a pull request",
@@ -155,8 +179,21 @@ export const githubArgsSchema: Record<GitHubOp, z.ZodTypeAny> = {
   "prs.get": numberId,
   "commits.list": repoId,
   "issues.create": repoId.extend({ title: z.string().trim().min(1).max(256), body: z.string().trim().max(65536).optional() }),
-  "branches.create": repoId.extend({ ref: z.string().trim().min(1).max(100), sha: z.string().trim().min(7).max(40) }),
-  "prs.create": repoId.extend({ title: z.string().trim().min(1).max(256), head: z.string().trim().min(1), base: z.string().trim().min(1), body: z.string().trim().max(65536).optional() }),
+  "issues.update": numberId.extend({
+    title: z.string().trim().min(1).max(256).optional(),
+    body: z.string().trim().max(65536).nullable().optional(),
+    state: z.enum(["open", "closed"]).optional(),
+  }).refine((value) => value.title !== undefined || value.body !== undefined || value.state !== undefined, "At least one issue field is required"),
+  "branches.create": repoId.extend({
+    ref: z.string().trim().min(1).max(100).regex(/^(?!\/)(?!.*(?:\.\.|\/\/|@\{|\\|[\s~^:?*\[]))[\w./-]+(?<!\/|\.lock)$/),
+    sha: z.string().trim().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i),
+  }),
+  "prs.create": repoId.extend({
+    title: z.string().trim().min(1).max(256),
+    head: z.string().trim().min(1).max(100),
+    base: z.string().trim().min(1).max(100),
+    body: z.string().trim().max(65536).optional(),
+  }),
 };
 
 export function splitRepo(full: string): { owner: string; repo: string } {

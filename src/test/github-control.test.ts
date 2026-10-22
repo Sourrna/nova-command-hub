@@ -6,11 +6,11 @@ import { GITHUB_CONTROL_CAPABILITIES } from "@/routes/github-control";
 import { normalizeGitHubCommandReadData, resolveGitHubCommandRead, summarizeGitHubCommandRead } from "@/lib/nova/github-command";
 
 describe("GitHub capability registry", () => {
-  it("labels create operations unavailable until a write adapter is implemented", () => {
+  it("labels write adapters ready but blocked pending durable approvals", () => {
     const writes = GITHUB_CONTROL_CAPABILITIES.filter((capability) => capability.access === "write");
-    expect(writes.map((capability) => capability.operation)).toEqual(["issues.create", "branches.create", "prs.create"]);
-    expect(writes.every((capability) => !capability.implemented)).toBe(true);
-    expect(GITHUB_CONTROL_CAPABILITIES.filter((capability) => capability.implemented).every((capability) => capability.access === "read")).toBe(true);
+    expect(writes.map((capability) => capability.operation)).toEqual(["issues.create", "issues.update", "branches.create", "prs.create"]);
+    expect(writes.every((capability) => capability.implemented && capability.writeBlocked)).toBe(true);
+    expect(GITHUB_CONTROL_CAPABILITIES.filter((capability) => capability.access === "read").every((capability) => capability.implemented && !capability.writeBlocked)).toBe(true);
   });
 
   describe("GitHub command read routing", () => {
@@ -65,6 +65,11 @@ describe("GitHub capability registry", () => {
     expect(githubArgsSchema["issues.get"].safeParse({ owner: "a", repo: "b", number: -1 }).success).toBe(false);
     expect(githubArgsSchema["repo.get"].safeParse({ owner: "../users", repo: "project" }).success).toBe(false);
     expect(githubArgsSchema["repo.get"].safeParse({ owner: "octo", repo: "project?per_page=1" }).success).toBe(false);
+  });
+  it("validates issue update payloads and rejects empty updates", () => {
+    expect(githubArgsSchema["issues.update"].safeParse({ owner: "a", repo: "b", number: 4, state: "closed" }).success).toBe(true);
+    expect(githubArgsSchema["issues.update"].safeParse({ owner: "a", repo: "b", number: 4 }).success).toBe(false);
+    expect(githubArgsSchema["issues.update"].safeParse({ owner: "a", repo: "b", number: 4, state: "merged" }).success).toBe(false);
   });
   it("marks writes as approval-required", () => {
     expect(githubCaps["issues.create"].approvalRequired).toBe(true);

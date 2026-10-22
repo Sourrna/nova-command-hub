@@ -72,12 +72,12 @@ describe("GitHub connector (github.server)", () => {
     }
   });
 
-  it("returns rate on 403 (forbidden — treated as rate/permission)", async () => {
+  it("returns permission on 403 without rate-limit headers", async () => {
     const restore = withCreds();
     try {
       const r = await ghGet("repos/Sourrna/nova-brand-ai", status(403));
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.code).toBe("rate");
+      if (!r.ok) expect(r.code).toBe("permission");
     } finally {
       restore();
     }

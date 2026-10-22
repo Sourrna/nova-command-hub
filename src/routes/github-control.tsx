@@ -16,10 +16,11 @@ export const Route = createFileRoute("/github-control")({
 
 type Tab = "overview" | "branches" | "issues" | "pulls" | "commits";
 
-export const GITHUB_CONTROL_CAPABILITIES = Object.values(githubCaps).map(({ op, authz, implemented }) => ({
+export const GITHUB_CONTROL_CAPABILITIES = Object.values(githubCaps).map(({ op, authz, implemented, writeBlocked }) => ({
   operation: op,
   access: authz,
   implemented,
+  writeBlocked,
 }));
 
 function GitHubControlPage() {
@@ -114,12 +115,16 @@ function GitHubControlPage() {
               <li key={capability.operation} className="flex items-center justify-between">
                 <span>{capability.operation}</span>
                 <span className={`label-hud ${capability.implemented ? "" : "text-muted-foreground"}`}>
-                  {capability.implemented ? capability.access : "not implemented"}
+                  {!capability.implemented
+                    ? "not implemented"
+                    : capability.writeBlocked
+                      ? "adapter ready · blocked pending durable approval"
+                      : capability.access}
                 </span>
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-muted-foreground">Repository reads use the GitHub API. GitHub writes are unavailable; no issue, branch, or pull request is created here.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Repository reads use the GitHub API. Issue, branch, and pull-request mutations have server-side adapters but stay blocked until authenticated, durable, payload-bound approvals are configured.</p>
         </Panel>
       </div>
     </>

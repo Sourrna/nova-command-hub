@@ -162,7 +162,9 @@ export function CommandPage() {
         if (step.state !== "pending" || !planned?.gated) continue;
         const operation = planned.kind === "write" ? "write" : planned.kind === "publish" ? "publish" : undefined;
         if (!operation) continue;
-        if (planned.connector === "notion" || planned.connector === "linkedin") {
+        if (planned.connector === "github") {
+          actions.requestApproval(planned.title, plan.goal.match(/(?<![\w.-])([A-Za-z0-9_-]+)\/([A-Za-z0-9._-]+)(?![\w.-])/)?.[0] ?? "GitHub repository", "github", undefined, operation);
+        } else if (planned.connector === "notion" || planned.connector === "linkedin") {
           const generated = r.steps.find((item) => item.state === "done" && typeof item.artifact === "object" && item.artifact !== null && "text" in item.artifact);
           const text = generated && typeof generated.artifact === "object" && generated.artifact !== null && "text" in generated.artifact && typeof generated.artifact.text === "string" ? generated.artifact.text : plan.goal;
           const title = text.split("\n").find((line) => line.trim())?.slice(0, 200) || plan.goal.slice(0, 200);
@@ -211,7 +213,7 @@ export function CommandPage() {
         </Panel>
         <Panel title="Approval posture">
           <div className="flex items-center gap-2 text-sm"><ShieldCheck size={16} className="text-warn" /><span>External writes fail-closed</span></div>
-          <p className="mt-2 text-xs text-muted-foreground">Notion and LinkedIn writes require explicit approval and a configured shared durable approval store. No external write is enabled in this deployment.</p>
+          <p className="mt-2 text-xs text-muted-foreground">GitHub, Notion, and LinkedIn mutations require authenticated, payload-bound durable approval. No external write is enabled in this deployment.</p>
         </Panel>
 
         {plan && (
@@ -257,7 +259,7 @@ export function CommandPage() {
               {mode === "planning" && <LoadingLine label="Validating plan" />}
               {mode === "running" && <LoadingLine label="Executing steps" />}
               {mode === "idle" && !result && <StateBlock title="Ready" hint="Plan generated. Execute supported non-destructive steps through existing services." action={<button className="btn btn-primary" onClick={runPlan}><Play size={14} />Execute</button>} />}
-              {result && <StateBlock title={result.state === "awaiting_approval" ? "Awaiting approval" : result.state === "failed" ? "Failed" : "Complete"} hint={result.state === "awaiting_approval" ? "No external action ran. Review any created request in Activity; LinkedIn publishing requires a selected account." : "See the operation output above."} action={<button className="btn btn-ghost" onClick={reset}><RotateCcw size={14} />New goal</button>} />}
+              {result && <StateBlock title={result.state === "awaiting_approval" ? "Awaiting approval" : result.state === "failed" ? "Failed" : "Complete"} hint={result.state === "awaiting_approval" ? "No external action ran. Review the local request in Activity; provider writes remain disabled until secure shared approval storage is configured." : "See the operation output above."} action={<button className="btn btn-ghost" onClick={reset}><RotateCcw size={14} />New goal</button>} />}
             </Panel>
             {result?.steps.some((step) => step.state === "done" && getArtifactText(step.artifact)) && (
               <Panel title="Continue generated draft" className="lg:col-span-3">

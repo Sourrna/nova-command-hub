@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildSnapshot } from "@/lib/nova/github.functions";
 
 const ok = <T>(data: T) => ({ ok: true as const, data });
-const fail = (code: "missing" | "auth" | "rate" | "error", error: string) => ({
+const fail = (code: "missing" | "auth" | "permission" | "rate" | "error", error: string) => ({
   ok: false as const,
   code,
   error,

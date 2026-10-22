@@ -32,6 +32,12 @@ describe("buildPlan", () => {
     expect(buildPlan("Draft a project update").steps.some((step) => step.connector === "github")).toBe(false);
   });
 
+  it("keeps GitHub mutations gated instead of routing them through a read adapter", () => {
+    const plan = buildPlan("Create issue in GitHub");
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]).toMatchObject({ kind: "write", connector: "github", gated: true });
+  });
+
   it("falls back to an analysis step for an unrelated goal", () => {
     const p = buildPlan("hello world");
     expect(p.steps.length).toBe(1);

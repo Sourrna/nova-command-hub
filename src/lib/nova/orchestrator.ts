@@ -89,12 +89,16 @@ export function buildPlan(goal: string): ExecutionPlan {
   const steps: PlannedStep[] = [];
   const has = (kw: string) => g.includes(kw);
   const mentionsGitHubRead = /\b(github|repos?|repositories|issues?|pull requests?|prs?|branches?|commits?)\b/.test(g);
+  const githubMutation = /\b(create|update|edit|close|reopen)\b.{0,40}\b(issues?|branches?|pull requests?|prs?)\b|\b(issues?|branches?|pull requests?|prs?)\b.{0,40}\b(create|update|edit|close|reopen)\b|\bopen\s+(?:a|an|new)\s+(?:issues?|branches?|pull requests?|prs?)\b/.test(g);
 
   if (has("draft") || has("write") || has("content") || has("post") || has("publish")) {
     steps.push({ id: "s1-generate", kind: "generate", title: "Draft content from goal", connector: "openai", gated: false, dependsOn: [] });
   }
-  if (mentionsGitHubRead) {
+  if (mentionsGitHubRead && !githubMutation) {
     steps.push({ id: "s2-github", kind: "read", title: "Read GitHub context", connector: "github", gated: false, dependsOn: [] });
+  }
+  if (githubMutation) {
+    steps.push({ id: "s2-github-write", kind: "write", title: "Perform requested GitHub mutation", connector: "github", gated: true, dependsOn: [] });
   }
   if (has("notion") || has("calendar") || has("notes") || has("database")) {
     steps.push({ id: "s3-notion", kind: "read", title: "Read Notion context", connector: "notion", gated: false, dependsOn: [] });
