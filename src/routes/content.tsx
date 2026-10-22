@@ -11,7 +11,7 @@ export const Route = createFileRoute("/content")({
   component: Studio,
 });
 
-function Studio() {
+export function Studio() {
   const items = useNova((s) => s.content);
   const approvals = useNova((s) => s.approvals);
   const [title, setTitle] = useState("");

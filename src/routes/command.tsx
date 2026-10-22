@@ -43,10 +43,11 @@ export function CommandPage() {
   const doGen = useServerFn(generateAi);
   const doNotionSearch = useServerFn(searchNotion);
   const doLinkedinSnapshot = useServerFn(getLinkedinSnapshot);
+  const linkedinReady = health.get("linkedin").status === "connected";
   const linkedinAuthorsQuery = useQuery({
     queryKey: ["command-linkedin-authors"],
     queryFn: () => doLinkedinSnapshot(),
-    enabled: draftChannel === "LinkedIn",
+    enabled: draftChannel === "LinkedIn" && linkedinReady,
     staleTime: 60_000,
     retry: false,
   });
@@ -261,11 +262,11 @@ export function CommandPage() {
                     <select className="field w-32" aria-label="Draft channel" value={draftChannel} onChange={(e) => setDraftChannel(e.target.value)}>
                       <option>LinkedIn</option><option>Notion</option>
                     </select>
-                    {draftChannel === "LinkedIn" && <select className="field max-w-64" aria-label="LinkedIn author" value={draftAuthor} onChange={(e) => setDraftAuthor(e.target.value)} disabled={!linkedinAuthors.length}>
-                      <option value="">{linkedinAuthors.length ? "Select LinkedIn author" : "No LinkedIn author available"}</option>
+                    {draftChannel === "LinkedIn" && <select className="field max-w-64" aria-label="LinkedIn author" value={draftAuthor} onChange={(e) => setDraftAuthor(e.target.value)} disabled={!linkedinReady || !linkedinAuthors.length}>
+                      <option value="">{linkedinAuthors.length ? "Select LinkedIn author (optional)" : "No LinkedIn author available (optional)"}</option>
                       {linkedinAuthors.map((author) => <option key={author} value={author}>{author}</option>)}
                     </select>}
-                    <button className="btn btn-primary" disabled={draftChannel === "LinkedIn" && !linkedinAuthors.includes(draftAuthor)} onClick={() => actions.addContent(title, draftChannel, text, "draft", draftChannel === "LinkedIn" ? draftAuthor : undefined)}>Save to Content Studio</button>
+                    <button className="btn btn-primary" onClick={() => actions.addContent(title, draftChannel, text, "draft", draftChannel === "LinkedIn" ? draftAuthor || undefined : undefined)}>Save to Content Studio</button>
                     <Link to="/content" className="btn">Open Studio <ExternalLink size={12} /></Link>
                   </div>;
                 })}

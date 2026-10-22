@@ -15,6 +15,7 @@ const commandMocks = vi.hoisted(() => ({
   interpretCall: vi.fn(),
   generateCall: vi.fn(),
   linkedinCall: vi.fn(),
+  linkedinConnected: false,
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -40,11 +41,13 @@ vi.mock("@/lib/nova/notion.functions", () => ({ searchNotion: commandMocks.notio
 vi.mock("@/lib/nova/linkedin.functions", () => ({ getLinkedinSnapshot: commandMocks.linkedin }));
 vi.mock("@/lib/nova/health", () => ({
   useHealth: () => ({
-    get: (id: string) => ({ status: id === "xai" ? "connected" : "needs_setup", reason: "test", missing: [] }),
+    get: (id: string) => ({ status: id === "xai" || (id === "linkedin" && commandMocks.linkedinConnected) ? "connected" : "needs_setup", reason: "test", missing: [] }),
   }),
 }));
 
 import { CommandPage } from "@/routes/command";
+import { Studio } from "@/routes/content";
+import { Activity } from "@/routes/activity";
 
 beforeEach(() => {
   actions.reset();
@@ -64,6 +67,7 @@ beforeEach(() => {
     value: { text: "Launch headline\nFull generated announcement.", model: "grok-test" },
   });
   commandMocks.linkedinCall.mockReset().mockResolvedValue({ ok: true, authors: ["urn:li:organization:321"] });
+  commandMocks.linkedinConnected = false;
 });
 
 function renderPage() {
@@ -85,6 +89,7 @@ describe("command workspace — plan + execution", () => {
   });
 
   it("renders, persists, restores, and continues a generated draft", async () => {
+    commandMocks.linkedinConnected = true;
     const first = renderPage();
     fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Something unrelated" } });
     fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
@@ -100,9 +105,42 @@ describe("command workspace — plan + execution", () => {
     expect(commandMocks.generateCall).toHaveBeenCalledWith({ data: { provider: "xai", prompt: "Draft a launch announcement" } });
 
     first.unmount();
+    const studio = render(<Studio />);
+    expect(await screen.findByDisplayValue("Launch headline\nFull generated announcement.")).toBeInTheDocument();
+    studio.unmount();
+
+    const activity = render(<Activity />);
+    expect(await screen.findByText(/Command execution complete: Something unrelated/)).toBeInTheDocument();
+    activity.unmount();
+
     renderPage();
     expect(await screen.findByText(/Full generated announcement\./)).toBeInTheDocument();
     expect(screen.getByText(/Restored the most recent command execution/)).toBeInTheDocument();
+  });
+
+  it("saves a local LinkedIn draft without a connected account or live author lookup", async () => {
+    const command = renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/describe a goal/i), { target: { value: "Draft a LinkedIn announcement" } });
+    fireEvent.click(screen.getByRole("button", { name: /plan execution/i }));
+    await screen.findByText(/Using validated AI plan/);
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    expect(await screen.findByText(/Full generated announcement\./)).toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "Save to Content Studio" })).toBeEnabled();
+    expect(commandMocks.linkedinCall).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save to Content Studio" }));
+    expect(readState().content.some((item) => item.notes === "Launch headline\nFull generated announcement." && !item.linkedinAuthor)).toBe(true);
+
+    command.unmount();
+    const studio = render(<Studio />);
+    expect(await screen.findByDisplayValue("Launch headline\nFull generated announcement.")).toBeInTheDocument();
+    studio.unmount();
+    const activity = render(<Activity />);
+    expect(await screen.findByText(/Command execution complete: Draft a LinkedIn announcement/)).toBeInTheDocument();
+    activity.unmount();
+
+    renderPage();
+    expect(await screen.findByText(/Full generated announcement\./)).toBeInTheDocument();
   });
 
   it("keeps a gated Notion step pending and creates only a local approval request", async () => {
@@ -127,6 +165,12 @@ describe("command workspace — plan + execution", () => {
     expect(readState().executions[0]?.result.steps[0]?.state).toBe("pending");
     expect(readState().approvals[0]?.state).toBe("pending");
     expect(readState().approvals[0]?.operation).toBe("write");
+    expect(readState().log[0]?.kind).toBe("approval");
+
+    const activity = render(<Activity />);
+    expect(await screen.findByText(/Approval gate · 1 pending/)).toBeInTheDocument();
+    expect(screen.getByText(/Command execution awaiting_approval: Save campaign/)).toBeInTheDocument();
+    activity.unmount();
   });
 
   it("keeps a gated LinkedIn publish step pending and creates a local approval request", async () => {

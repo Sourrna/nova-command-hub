@@ -180,7 +180,9 @@ export const actions = {
     update((s) => ({ approvals: [{ id: uid(), at: now(), action, target, connector, state: "pending", ref, ...(operation ? { operation } : {}) }, ...s.approvals] }),
       `Approval requested: ${action} → ${target}`, "approval"),
   saveExecution: (goal: string, result: ExecutionResult) =>
-    update((s) => ({ executions: [{ id: uid(), goal, result, savedAt: now() }, ...s.executions].slice(0, 30) }), `Command execution ${result.state}: ${goal}`, result.state === "failed" ? "blocked" : "info"),
+    update((s) => ({ executions: [{ id: uid(), goal, result, savedAt: now() }, ...s.executions].slice(0, 30) }),
+      `Command execution ${result.state}: ${goal}`,
+      result.state === "failed" ? "blocked" : result.state === "awaiting_approval" ? "approval" : "info"),
   resolveApproval: (id: string, approved: boolean, connectorReady: boolean) => {
     const a = load().approvals.find((x) => x.id === id);
     if (!a) return;

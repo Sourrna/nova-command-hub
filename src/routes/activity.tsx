@@ -16,7 +16,7 @@ export const Route = createFileRoute("/activity")({
   component: Activity,
 });
 
-function Activity() {
+export function Activity() {
   const { log, approvals, content } = useNova((s) => s);
   const health = useHealth();
   const execute = useServerFn(executeNotionWrite);
