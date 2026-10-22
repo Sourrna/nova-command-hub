@@ -115,7 +115,11 @@ function renderPage() {
   return render(<QueryClientProvider client={queryClient}><CommandPage /></QueryClientProvider>);
 }
 
-describe("command workspace Ã¢â‚¬â€ plan + execution", () => {
+function expectDraftBodyInStudio(body: string) {
+  expect(screen.getAllByLabelText("Notes").map((field) => field instanceof HTMLTextAreaElement ? field.value : "")).toContain(body);
+}
+
+describe("command workspace — plan + execution", () => {
   it("uses a validated interpreted plan and rejects unsupported operations", () => {
     const candidate = {
       objective: "Research project",
@@ -141,12 +145,13 @@ describe("command workspace Ã¢â‚¬â€ plan + execution", () => {
     const save = screen.getByRole("button", { name: "Save to Content Studio" });
     await waitFor(() => expect(save).toBeEnabled());
     fireEvent.click(save);
-    expect(readState().content.some((item) => item.notes === "Launch headline\nFull generated announcement." && item.linkedinAuthor === "urn:li:organization:321")).toBe(true);
+    expect(readState().content.some((item) => item.title === "Launch headline" && item.notes === "Launch headline\nFull generated announcement." && item.linkedinAuthor === "urn:li:organization:321")).toBe(true);
     expect(commandMocks.generateCall).toHaveBeenCalledWith({ data: { provider: "xai", prompt: "Draft a launch announcement" } });
 
     first.unmount();
     const studio = render(<Studio />);
     expect(await screen.findByDisplayValue("Launch headline")).toBeInTheDocument();
+    expectDraftBodyInStudio("Launch headline\nFull generated announcement.");
     studio.unmount();
 
     const activity = render(<Activity />);
@@ -169,11 +174,12 @@ describe("command workspace Ã¢â‚¬â€ plan + execution", () => {
     expect(screen.getByRole("button", { name: "Save to Content Studio" })).toBeEnabled();
     expect(commandMocks.linkedinCall).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Save to Content Studio" }));
-    expect(readState().content.some((item) => item.notes === "Launch headline\nFull generated announcement." && !item.linkedinAuthor)).toBe(true);
+    expect(readState().content.some((item) => item.title === "Launch headline" && item.notes === "Launch headline\nFull generated announcement." && !item.linkedinAuthor)).toBe(true);
 
     command.unmount();
     const studio = render(<Studio />);
     expect(await screen.findByDisplayValue("Launch headline")).toBeInTheDocument();
+    expectDraftBodyInStudio("Launch headline\nFull generated announcement.");
     studio.unmount();
     const activity = render(<Activity />);
     expect(await screen.findByText(/Command execution complete: Draft a LinkedIn announcement/)).toBeInTheDocument();
@@ -211,6 +217,7 @@ describe("command workspace Ã¢â‚¬â€ plan + execution", () => {
     const activity = render(<Activity />);
     expect(await screen.findByText(/Approval gate.*1 pending/)).toBeInTheDocument();
     expect(screen.getByText(/Command execution awaiting_approval: Save campaign/)).toBeInTheDocument();
+    expect(commandMocks.notionExecuteCall).not.toHaveBeenCalled();
     activity.unmount();
   });
 
@@ -255,7 +262,7 @@ describe("command workspace Ã¢â‚¬â€ plan + execution", () => {
   });
 });
 
-describe("command interpreter Ã¢â‚¬â€ schema validation", () => {
+describe("command interpreter — schema validation", () => {
   it("rejects malformed AI output", () => {
     expect(parseInterpretation("not json").ok).toBe(false);
     expect(parseInterpretation("{\"objective\":\"x\"}").ok).toBe(false);
@@ -274,7 +281,7 @@ describe("command interpreter Ã¢â‚¬â€ schema validation", () => {
   });
 });
 
-describe("command flow Ã¢â‚¬â€ missing credentials and approvals", () => {
+describe("command flow — missing credentials and approvals", () => {
   it("fails execution when AI handler reports missing credentials", async () => {
     const p = buildPlan("Draft a LinkedIn post");
     const gen = p.steps.find((s) => s.kind === "generate")!;
