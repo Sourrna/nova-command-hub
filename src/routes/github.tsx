@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, GitCommit, CircleDot, Lock, RefreshCw } from "lucide-react";
-import { PageHeader, Panel, Empty, StatusChip, fmtTime } from "@/components/nova/ui";
+import { useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { ExternalLink, GitCommit, CircleDot, RefreshCw } from "lucide-react";
+import { PageHeader, Panel, Empty } from "@/components/nova/ui";
 import { ConnectorDetail } from "@/components/nova/ConnectorViews";
 import { getRepoSnapshot } from "@/lib/nova/github.functions";
+import { githubWriteInputSchema, requestGitHubApproval, type GitHubWriteInput } from "@/lib/nova/github-write.functions";
 import { meta } from "@/lib/nova/meta";
 
 export const Route = createFileRoute("/github")({
@@ -30,13 +33,67 @@ const SETUP_HINTS: Record<string, { title: string; hint: string }> = {
   },
 };
 
-function GithubPage() {
+export function GithubPage() {
+  const requestApproval = useServerFn(requestGitHubApproval);
   const q = useQuery({
     queryKey: ["gh-snapshot"],
     queryFn: () => getRepoSnapshot(),
     staleTime: 60_000,
   });
   const s = q.data;
+  const [operation, setOperation] = useState<GitHubWriteInput["op"]>("issues.create");
+  const [owner, setOwner] = useState("Sourrna");
+  const [repo, setRepo] = useState("nova-brand-ai");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [issueNumber, setIssueNumber] = useState("");
+  const [issueState, setIssueState] = useState<"open" | "closed">("open");
+  const [head, setHead] = useState("");
+  const [base, setBase] = useState("main");
+  const [branchName, setBranchName] = useState("");
+  const [sha, setSha] = useState("");
+  const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const requestKey = useRef<{ payload: string; id: string } | null>(null);
+
+  async function submitGitHubRequest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const mutation = {
+      op: operation,
+      owner,
+      repo,
+      ...(operation === "issues.create" ? { title, body } : {}),
+      ...(operation === "issues.update" ? { number: issueNumber, title: title || undefined, body: body || undefined, state: issueState } : {}),
+      ...(operation === "prs.create" ? { title, head, base, body } : {}),
+      ...(operation === "branches.create" ? { ref: branchName, sha } : {}),
+    };
+    const parsed = githubWriteInputSchema.safeParse(mutation);
+    if (!parsed.success) {
+      setRequestMessage(parsed.error.issues[0]?.message ?? "GitHub operation is invalid.");
+      return;
+    }
+    const payloadJson = JSON.stringify(parsed.data);
+    if (requestKey.current?.payload !== payloadJson) {
+      requestKey.current = { payload: payloadJson, id: crypto.randomUUID() };
+    }
+    setSubmitting(true);
+    setRequestMessage(null);
+    try {
+      const result = await requestApproval({
+        data: { idempotencyKey: requestKey.current.id, mutation: parsed.data },
+      });
+      if (result.ok) {
+        requestKey.current = null;
+        setRequestMessage(`Durable approval ${result.approval.id} is ${result.approval.status}. Review it in Activity before execution.`);
+      } else {
+        setRequestMessage(result.error);
+      }
+    } catch (error) {
+      setRequestMessage(error instanceof Error ? error.message : "Could not create the durable approval request.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -123,6 +180,59 @@ function GithubPage() {
               </div>
             </div>
           )}
+        </Panel>
+
+        <Panel title="Request an approved GitHub operation">
+          <p className="mb-3 text-xs text-muted-foreground">
+            This creates a durable pending request only. Nothing is sent to GitHub until you approve it and explicitly execute it from Activity.
+          </p>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitGitHubRequest}>
+            <label className="space-y-1 text-xs">Operation
+              <select className="field w-full" value={operation} onChange={(event) => setOperation(event.target.value as GitHubWriteInput["op"])}>
+                <option value="issues.create">Create issue</option>
+                <option value="issues.update">Update issue</option>
+                <option value="branches.create">Create branch</option>
+                <option value="prs.create">Create pull request</option>
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1 text-xs">Owner<input className="field w-full" value={owner} onChange={(event) => setOwner(event.target.value)} required /></label>
+              <label className="space-y-1 text-xs">Repository<input className="field w-full" value={repo} onChange={(event) => setRepo(event.target.value)} required /></label>
+            </div>
+            {operation === "issues.update" && (
+              <label className="space-y-1 text-xs">Issue number<input className="field w-full" inputMode="numeric" value={issueNumber} onChange={(event) => setIssueNumber(event.target.value)} required /></label>
+            )}
+            {operation === "branches.create" ? (
+              <>
+                <label className="space-y-1 text-xs">New branch<input className="field w-full" value={branchName} onChange={(event) => setBranchName(event.target.value)} required /></label>
+                <label className="space-y-1 text-xs">Source commit SHA<input className="field w-full font-mono" value={sha} onChange={(event) => setSha(event.target.value)} required /></label>
+              </>
+            ) : operation === "prs.create" ? (
+              <>
+                <label className="space-y-1 text-xs">Head branch<input className="field w-full" value={head} onChange={(event) => setHead(event.target.value)} required /></label>
+                <label className="space-y-1 text-xs">Base branch<input className="field w-full" value={base} onChange={(event) => setBase(event.target.value)} required /></label>
+              </>
+            ) : null}
+            {operation !== "branches.create" && (
+              <label className="space-y-1 text-xs sm:col-span-2">Title<input className="field w-full" value={title} onChange={(event) => setTitle(event.target.value)} required={operation !== "issues.update"} /></label>
+            )}
+            {operation === "issues.update" && (
+              <label className="space-y-1 text-xs">Issue state
+                <select className="field w-full" value={issueState} onChange={(event) => setIssueState(event.target.value as "open" | "closed")}>
+                  <option value="open">Open</option><option value="closed">Closed</option>
+                </select>
+              </label>
+            )}
+            {(operation === "issues.create" || operation === "issues.update" || operation === "prs.create") && (
+              <label className="space-y-1 text-xs sm:col-span-2">Body<textarea className="field w-full" rows={3} value={body} onChange={(event) => setBody(event.target.value)} /></label>
+            )}
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+              <button className="btn btn-primary" type="submit" disabled={submitting}>
+                {submitting ? "Requesting…" : "Request approval"}
+              </button>
+              {requestMessage && <span role="status" className="text-xs text-muted-foreground">{requestMessage}</span>}
+            </div>
+          </form>
         </Panel>
 
         <ConnectorDetail id="github" />

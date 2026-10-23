@@ -6,6 +6,7 @@ import {
 import { useNova } from "@/lib/nova/store";
 import { useT } from "@/lib/nova/i18n";
 import { cn } from "@/lib/utils";
+import { useWorkspacePersistence } from "@/lib/nova/workspace-sync";
 
 const NAV = [
   { group: "Operations", items: [
@@ -35,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const lang = useNova((s) => s.lang);
   const pending = useNova((s) => s.approvals.filter((a) => a.state === "pending").length);
   const t = useT();
+  const persistence = useWorkspacePersistence();
 
   useEffect(() => { document.documentElement.dir = lang === "fa" ? "rtl" : "ltr"; document.documentElement.lang = lang; }, [lang]);
   useEffect(() => setOpen(false), [path]);
@@ -85,12 +87,33 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="label-hud">NOVA COMMAND INTERFACE · YEAR 3088</span>
             </div>
             <div className="ms-auto flex items-center gap-2">
-              <Link to="/activity" className="btn btn-ghost" aria-label={`${pending} pending approvals`}>
+              <Link to="/activity" className="btn btn-ghost" aria-label={`${pending} local pending approvals`}>
                 <ShieldCheck size={15} /> <span className="font-mono text-xs">{pending}</span>
               </Link>
-              <span className="chip text-ok glow-pulse"><span className="dot" />ONLINE</span>
+              <span className={cn(
+                "chip",
+                persistence.status === "synced" ? "text-ok glow-pulse" : persistence.status === "error" ? "text-destructive" : "text-warn",
+              )}>
+                <span className="dot" />
+                {persistence.status === "synced" ? "SYNCED" : persistence.status === "loading" ? "CHECKING" : persistence.status === "error" ? "ERROR" : "LOCAL"}
+              </span>
             </div>
           </header>
+          {persistence.status !== "synced" && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={cn(
+                "flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-xs",
+                persistence.status === "error" ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-accent/30 bg-accent/5 text-muted-foreground",
+              )}
+            >
+              <span>{persistence.message}</span>
+              {(persistence.status === "local-only" || persistence.status === "error") && (
+                <button className="btn btn-ghost h-7 px-2 text-xs" onClick={persistence.retry}>Retry sync</button>
+              )}
+            </div>
+          )}
           <main className="mx-auto w-full max-w-7xl flex-1 p-4 md:p-6 lg:p-8">{children}</main>
         </div>
     </div>

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, X, Loader2, AlertTriangle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { actions, useNova, type LogEntry } from "@/lib/nova/store";
@@ -11,6 +11,14 @@ import { executeLinkedinPublish, grantLinkedinApproval, revokeLinkedinApproval }
 import { PageHeader, Panel, Empty, fmtTime } from "@/components/nova/ui";
 import { meta } from "@/lib/nova/meta";
 import { approvalHandlerFor, dispatchApproval } from "@/lib/nova/approval-dispatch";
+import {
+  approveDurableApproval as approveDurableApprovalFn,
+  listDurableApprovals,
+  rejectDurableApproval as rejectDurableApprovalFn,
+  revokeDurableApproval as revokeDurableApprovalFn,
+  type DurableApprovalView,
+} from "@/lib/nova/durable-approval.functions";
+import { githubWrite } from "@/lib/nova/github-write.functions";
 
 export const Route = createFileRoute("/activity")({
   head: () => meta("Activity Log", "Audit log of every operation and the approval gate for write actions."),
@@ -26,13 +34,93 @@ export function Activity() {
   const linkedinGrant = useServerFn(grantLinkedinApproval);
   const linkedinRevoke = useServerFn(revokeLinkedinApproval);
   const revoke = useServerFn(revokeNotionApproval);
+  const loadDurable = useServerFn(listDurableApprovals);
+  const approveDurable = useServerFn(approveDurableApprovalFn);
+  const rejectDurable = useServerFn(rejectDurableApprovalFn);
+  const revokeDurable = useServerFn(revokeDurableApprovalFn);
+  const executeGitHub = useServerFn(githubWrite);
   const [kind, setKind] = useState<"all" | LogEntry["kind"]>("all");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [durableApprovals, setDurableApprovals] = useState<DurableApprovalView[]>([]);
+  const [durableLoading, setDurableLoading] = useState(true);
+  const [durableLoadError, setDurableLoadError] = useState<string | null>(null);
+  const [durableActionError, setDurableActionError] = useState<string | null>(null);
+  const [durableNotice, setDurableNotice] = useState<string | null>(null);
   const shown = log.filter((l) => (kind === "all" || l.kind === kind) && l.message.toLowerCase().includes(q.toLowerCase()));
   const pending = approvals.filter((a) => a.state === "pending");
   const ready = (c: string) => (c === "notion" || c === "linkedin") && health.get(c as ConnectorId).status === "connected";
+
+  const refreshDurable = useCallback(async () => {
+    setDurableLoading(true);
+    try {
+      const response = await loadDurable();
+      if (!response.ok) {
+        setDurableLoadError(response.error);
+      } else {
+        setDurableApprovals(response.approvals);
+        setDurableLoadError(null);
+      }
+    } catch (error) {
+      setDurableLoadError(error instanceof Error ? error.message : "Could not load durable approvals.");
+    } finally {
+      setDurableLoading(false);
+    }
+  }, [loadDurable]);
+
+  useEffect(() => { void refreshDurable(); }, [refreshDurable]);
+
+  async function transitionDurable(id: string, action: "approve" | "reject" | "revoke") {
+    const key = `durable:${id}`;
+    setBusy((current) => ({ ...current, [key]: true }));
+    setDurableActionError(null);
+    setDurableNotice(null);
+    try {
+      const response = action === "approve"
+        ? await approveDurable({ data: { approvalId: id } })
+        : action === "reject"
+          ? await rejectDurable({ data: { approvalId: id } })
+          : await revokeDurable({ data: { approvalId: id } });
+      let actionError: string | null = null;
+      if (!response.ok) {
+        actionError = response.error;
+      } else {
+        setDurableNotice(action === "approve"
+          ? "Approval recorded. No provider write was executed."
+          : action === "reject" ? "Approval rejected." : "Approval revoked.");
+      }
+      await refreshDurable();
+      if (actionError) setDurableActionError(actionError);
+    } catch (error) {
+      setDurableActionError(error instanceof Error ? error.message : "Could not update durable approval.");
+    } finally {
+      setBusy((current) => ({ ...current, [key]: false }));
+    }
+  }
+
+  async function executeDurableGitHub(id: string) {
+    const key = `durable:${id}`;
+    setBusy((current) => ({ ...current, [key]: true }));
+    setDurableActionError(null);
+    setDurableNotice(null);
+    try {
+      const response = await executeGitHub({ data: { approvalId: id } });
+      let actionError: string | null = null;
+      if (!response.ok) {
+        actionError = response.error;
+      } else {
+        const number = response.data.number ? ` #${response.data.number}` : "";
+        setDurableNotice(`GitHub confirmed ${response.data.ref ? `branch ${response.data.ref}` : `the operation${number}`}.`);
+      }
+      await refreshDurable();
+      if (actionError) setDurableActionError(actionError);
+    } catch (error) {
+      setDurableActionError(error instanceof Error ? error.message : "GitHub execution failed.");
+    } finally {
+      setBusy((current) => ({ ...current, [key]: false }));
+    }
+  }
 
   async function approve(a: { id: string; connector: string; operation?: "write" | "publish" | undefined; ref?: string | undefined; action?: string }) {
     if (!approvalHandlerFor(a.connector, a.operation)) {
@@ -119,6 +207,53 @@ export function Activity() {
   return (
     <>
       <PageHeader kicker="Audit & approvals" title="Activity Log" />
+      <Panel title={`Durable approvals · ${durableApprovals.filter((approval) => approval.status === "pending").length} pending`} className="panel-glow">
+        {durableLoading ? (
+          <p className="text-sm text-muted-foreground">Loading owner-scoped approvals…</p>
+        ) : durableLoadError ? (
+          <Empty title="Durable approvals unavailable" hint={durableLoadError}>
+            <button className="btn btn-ghost" onClick={() => void refreshDurable()}>Retry</button>
+          </Empty>
+        ) : (
+          <>
+            {durableActionError && <p role="alert" className="mb-3 text-xs text-destructive">{durableActionError}</p>}
+            {durableApprovals.length ? <ul className="space-y-2">
+              {durableApprovals.map((approval) => {
+              const key = `durable:${approval.id}`;
+              return (
+                <li key={approval.id} className="flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm">
+                  <span className="flex-1">{approval.action} <span className="label-hud">→ {approval.target}</span></span>
+                  <span className="label-hud">{approval.provider} · {approval.operation}</span>
+                  <span className={`chip ${approval.status === "succeeded" ? "text-ok" : approval.status === "failed" ? "text-destructive" : approval.status === "pending" ? "text-warn" : "text-muted-foreground"}`}>{approval.status}</span>
+                  {approval.status === "pending" && (
+                    <>
+                      <button className="btn btn-primary" disabled={busy[key]} onClick={() => void transitionDurable(approval.id, "approve")}>
+                        <Check size={14} />Approve
+                      </button>
+                      <button className="btn" disabled={busy[key]} onClick={() => void transitionDurable(approval.id, "reject")}>
+                        <X size={14} />Reject
+                      </button>
+                    </>
+                  )}
+                  {approval.status === "approved" && approval.provider === "github" && (
+                    <>
+                      <button className="btn btn-primary" disabled={busy[key]} onClick={() => void executeDurableGitHub(approval.id)}>
+                        {busy[key] ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}Execute GitHub write
+                      </button>
+                      <button className="btn" disabled={busy[key]} onClick={() => void transitionDurable(approval.id, "revoke")}>Revoke</button>
+                    </>
+                  )}
+                  {approval.result?.url && <a className="btn btn-ghost" href={approval.result.url} target="_blank" rel="noreferrer">Open result</a>}
+                  {approval.errorCode && <span className="text-xs text-destructive">Provider error: {approval.errorCode}</span>}
+                  {approval.status === "pending" && <span className="text-xs text-muted-foreground">Expires {fmtTime(approval.expiresAt)}</span>}
+                </li>
+              );
+              })}
+            </ul> : <Empty title="No durable approval requests" hint="Validated GitHub mutation requests appear here after they are stored for your authenticated account." />}
+          </>
+        )}
+        {durableNotice && <p role="status" className="mt-3 text-xs text-muted-foreground">{durableNotice}</p>}
+      </Panel>
       <Panel title={`Approval gate · ${pending.length} pending`} className="panel-glow">
         {approvals.length ? (
           <ul className="space-y-2">
@@ -150,7 +285,7 @@ export function Activity() {
             ))}
           </ul>
         ) : <Empty title="No approval requests" hint="Publish and write actions will appear here before anything runs." />}
-        <p className="mt-3 text-xs text-muted-foreground">Requests can be reviewed or rejected locally. Approval and external writes remain unavailable until a shared durable approval store is configured. Unsupported connector/action pairs fail closed; no approval state alone authorizes an external write.</p>
+        <p className="mt-3 text-xs text-muted-foreground">These browser-local requests never authorize external writes. GitHub approvals use the authenticated durable flow above when it is configured; Notion and LinkedIn writes remain disabled until their provider handlers use that flow.</p>
       </Panel>
       <Panel title="Audit log" className="mt-4" action={
         <div className="flex gap-2">

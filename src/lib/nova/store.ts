@@ -5,8 +5,8 @@ export type Stage = "idea" | "strategy" | "draft" | "review" | "approved" | "pub
 export const STAGES: Stage[] = ["idea", "strategy", "draft", "review", "approved", "published", "measured"];
 
 export interface Task { id: string; title: string; status: "todo" | "doing" | "done"; priority: "low" | "med" | "high"; created: number }
-export interface ContentItem { id: string; title: string; channel: string; stage: Stage; notes: string; demo?: boolean; updated: number; /** Optional LinkedIn author URN (urn:li:person:… or urn:li:organization:…). Used only by the LinkedIn publish gate. */ linkedinAuthor?: string | undefined }
-export interface Project { id: string; name: string; status: "active" | "paused" | "done"; progress: number; demo?: boolean }
+export interface ContentItem { id: string; title: string; channel: string; stage: Stage; notes: string; demo?: boolean | undefined; updated: number; /** Optional LinkedIn author URN (urn:li:person:… or urn:li:organization:…). Used only by the LinkedIn publish gate. */ linkedinAuthor?: string | undefined }
+export interface Project { id: string; name: string; status: "active" | "paused" | "done"; progress: number; demo?: boolean | undefined }
 export interface Memory { id: string; text: string; tag: string; created: number }
 export interface LogEntry { id: string; at: number; kind: "info" | "approval" | "blocked" | "local"; message: string }
 export interface Approval { id: string; at: number; action: string; target: string; connector: string; state: "pending" | "approved" | "rejected" | "invalidated" | "executed" | "failed"; ref?: string | undefined; operation?: "write" | "publish" | undefined; payloadHash?: string | undefined; expiresAt?: number | undefined; pageId?: string | undefined }
@@ -23,6 +23,12 @@ export interface NovaState {
  * export/import round-trips; never exposes secrets. */
 export function readState(): NovaState {
   return load();
+}
+
+export function replaceWorkspaceState(next: NovaState): void {
+  state = next;
+  if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(next));
+  listeners.forEach((listener) => listener());
 }
 
 /** Export the current workspace as a portable JSON snapshot. Safe to share:

@@ -28,6 +28,19 @@ const commandMocks = vi.hoisted(() => ({
   linkedinExecuteCall: vi.fn(),
   linkedinGrantCall: vi.fn(),
   linkedinRevokeCall: vi.fn(),
+  durableList: Symbol("durableList"),
+  durableApprove: Symbol("durableApprove"),
+  durableReject: Symbol("durableReject"),
+  durableRevoke: Symbol("durableRevoke"),
+  githubWrite: Symbol("githubWrite"),
+  requestGitHubApproval: Symbol("requestGitHubApproval"),
+  githubSnapshot: vi.fn(),
+  githubApprovalCall: vi.fn(),
+  durableListCall: vi.fn(),
+  durableApproveCall: vi.fn(),
+  durableRejectCall: vi.fn(),
+  durableRevokeCall: vi.fn(),
+  githubWriteCall: vi.fn(),
   githubCall: vi.fn(),
   linkedinConnected: false,
 }));
@@ -58,6 +71,18 @@ vi.mock("@tanstack/react-start", async (importOriginal) => {
                     ? commandMocks.linkedinGrantCall
                     : fn === commandMocks.linkedinRevoke
                       ? commandMocks.linkedinRevokeCall
+                      : fn === commandMocks.durableList
+                        ? commandMocks.durableListCall
+                        : fn === commandMocks.durableApprove
+                          ? commandMocks.durableApproveCall
+                          : fn === commandMocks.durableReject
+                            ? commandMocks.durableRejectCall
+                            : fn === commandMocks.durableRevoke
+                              ? commandMocks.durableRevokeCall
+                              : fn === commandMocks.githubWrite
+                                ? commandMocks.githubWriteCall
+                        : fn === commandMocks.requestGitHubApproval
+                          ? commandMocks.githubApprovalCall
                       : fn === commandMocks.github
                         ? commandMocks.githubCall
                         : async () => ({ ok: false, error: "not used" }),
@@ -78,6 +103,23 @@ vi.mock("@/lib/nova/linkedin.functions", () => ({
   grantLinkedinApproval: commandMocks.linkedinGrant,
   revokeLinkedinApproval: commandMocks.linkedinRevoke,
 }));
+vi.mock("@/lib/nova/durable-approval.functions", () => ({
+  listDurableApprovals: commandMocks.durableList,
+  approveDurableApproval: commandMocks.durableApprove,
+  rejectDurableApproval: commandMocks.durableReject,
+  revokeDurableApproval: commandMocks.durableRevoke,
+}));
+vi.mock("@/lib/nova/github-write.functions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/nova/github-write.functions")>();
+  return {
+    ...actual,
+    githubWrite: commandMocks.githubWrite,
+    requestGitHubApproval: commandMocks.requestGitHubApproval,
+  };
+});
+vi.mock("@/lib/nova/github.functions", () => ({
+  getRepoSnapshot: commandMocks.githubSnapshot,
+}));
 vi.mock("@/lib/nova/health", () => ({
   useHealth: () => ({
     get: (id: string) => ({ status: id === "xai" || (id === "linkedin" && commandMocks.linkedinConnected) ? "connected" : "needs_setup", reason: "test", missing: [] }),
@@ -87,6 +129,7 @@ vi.mock("@/lib/nova/health", () => ({
 import { CommandPage } from "@/routes/command";
 import { Studio } from "@/routes/content";
 import { Activity } from "@/routes/activity";
+import { GithubPage } from "@/routes/github";
 
 beforeEach(() => {
   actions.reset();
@@ -112,6 +155,21 @@ beforeEach(() => {
   commandMocks.linkedinExecuteCall.mockReset();
   commandMocks.linkedinGrantCall.mockReset();
   commandMocks.linkedinRevokeCall.mockReset();
+  commandMocks.durableListCall.mockReset().mockResolvedValue({
+    ok: false, code: "database_unavailable", error: "Durable workspace storage is not configured.",
+  });
+  commandMocks.durableApproveCall.mockReset().mockResolvedValue({ ok: true, status: "approved" });
+  commandMocks.durableRejectCall.mockReset().mockResolvedValue({ ok: true, status: "rejected" });
+  commandMocks.durableRevokeCall.mockReset().mockResolvedValue({ ok: true, status: "revoked" });
+  commandMocks.githubWriteCall.mockReset().mockResolvedValue({
+    ok: false, code: "missing", error: "GitHub write credentials are not configured.",
+  });
+  commandMocks.githubApprovalCall.mockReset().mockResolvedValue({
+    ok: false, code: "database_unavailable", error: "Durable workspace storage is not configured.",
+  });
+  commandMocks.githubSnapshot.mockReset().mockResolvedValue({
+    ok: false, code: "missing", error: "GitHub read credentials are not configured.", repo: "Sourrna/nova-brand-ai", commits: [], issues: [],
+  });
   commandMocks.githubCall.mockReset().mockResolvedValue({
     ok: true,
     data: [{ number: 42, title: "Fix command issue", state: "open", html_url: "https://github.com/Sourrna/nova-brand-ai/issues/42" }],
@@ -286,6 +344,30 @@ describe("command workspace — plan + execution", () => {
     activity.unmount();
   });
 
+  it("submits a validated GitHub mutation request without executing a provider write", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><GithubPage /></QueryClientProvider>);
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Durable issue request" } });
+    fireEvent.click(screen.getByRole("button", { name: "Request approval" }));
+
+    expect(await screen.findByText("Durable workspace storage is not configured.")).toBeInTheDocument();
+    expect(commandMocks.githubApprovalCall).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        mutation: expect.objectContaining({
+          op: "issues.create",
+          owner: "Sourrna",
+          repo: "nova-brand-ai",
+          title: "Durable issue request",
+        }),
+      }),
+    }));
+    expect(commandMocks.githubWriteCall).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Request approval" }));
+    await waitFor(() => expect(commandMocks.githubApprovalCall).toHaveBeenCalledTimes(2));
+    expect(commandMocks.githubApprovalCall.mock.calls[1]?.[0].data.idempotencyKey)
+      .toBe(commandMocks.githubApprovalCall.mock.calls[0]?.[0].data.idempotencyKey);
+  });
+
   it("keeps a gated LinkedIn publish step pending and creates a local approval request", async () => {
     commandMocks.interpretCall.mockResolvedValueOnce({
       ok: true,
@@ -310,6 +392,33 @@ describe("command workspace — plan + execution", () => {
     expect(readState().approvals[0]?.connector).toBe("linkedin");
     expect(readState().approvals[0]?.operation).toBe("publish");
     expect(readState().content[0]?.channel).toBe("LinkedIn");
+  });
+
+  it("requires explicit durable approval and a separate execute action for GitHub writes", async () => {
+    const approval = {
+      id: "7e5bf3c0-8fdc-4a20-93a9-10a7c6f5bf01",
+      provider: "github",
+      operation: "issues.create",
+      target: "repos/Sourrna/nova-brand-ai/issues",
+      action: "issues.create repos/Sourrna/nova-brand-ai/issues",
+      status: "pending",
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    };
+    commandMocks.durableListCall
+      .mockResolvedValueOnce({ ok: true, approvals: [approval] })
+      .mockResolvedValueOnce({ ok: true, approvals: [{ ...approval, status: "approved" }] })
+      .mockResolvedValueOnce({ ok: true, approvals: [] });
+    const activity = render(<Activity />);
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Approval recorded. No provider write was executed.")).toBeInTheDocument();
+    expect(commandMocks.durableApproveCall).toHaveBeenCalledWith({ data: { approvalId: approval.id } });
+    expect(commandMocks.githubWriteCall).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Execute GitHub write" }));
+    await waitFor(() => expect(commandMocks.githubWriteCall).toHaveBeenCalledWith({ data: { approvalId: approval.id } }));
+    expect(await screen.findByText("GitHub write credentials are not configured.")).toBeInTheDocument();
+    activity.unmount();
   });
 
   it("builds a real plan from a publish goal with gated step", () => {

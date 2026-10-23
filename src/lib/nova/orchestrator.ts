@@ -22,11 +22,11 @@ export interface PlannedStep {
 export interface StepResult {
   stepId: string;
   state: "pending" | "running" | "done" | "failed" | "skipped";
-  startedAt?: number;
-  completedAt?: number;
+  startedAt?: number | undefined;
+  completedAt?: number | undefined;
   summary: string;
-  artifact?: unknown;
-  error?: string;
+  artifact?: unknown | undefined;
+  error?: string | undefined;
 }
 
 export interface ExecutionPlan {

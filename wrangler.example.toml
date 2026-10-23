@@ -1,0 +1,14 @@
+name = "nova-command-hub"
+main = ".output/server/index.mjs"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+CLOUDFLARE_ACCESS_TEAM_DOMAIN = "your-team.cloudflareaccess.com"
+CLOUDFLARE_ACCESS_AUD = "replace-with-access-application-audience"
+
+[[d1_databases]]
+binding = "NOVA_DB"
+database_name = "nova-command-hub"
+database_id = "replace-with-id-from-wrangler-d1-create"
+migrations_dir = "migrations"
